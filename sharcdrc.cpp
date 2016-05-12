@@ -87,10 +87,34 @@ static void cfunc_unimplemented(void *param)
 	sharc->sharc_cfunc_unimplemented();
 }
 
+static void cfunc_read_iop(void *param)
+{
+	adsp21062_device *sharc = (adsp21062_device *)param;
+	sharc->sharc_cfunc_read_iop();
+}
+
+static void cfunc_write_iop(void *param)
+{
+	adsp21062_device *sharc = (adsp21062_device *)param;
+	sharc->sharc_cfunc_write_iop();
+}
+
+
 void adsp21062_device::sharc_cfunc_unimplemented()
 {
 	UINT64 op = m_core->arg64;
 	fatalerror("PC=%08X: Unimplemented op %04X%08X\n", m_core->pc, (UINT32)(op >> 32), (UINT32)(op));
+}
+
+void adsp21062_device::sharc_cfunc_read_iop()
+{
+	m_core->arg1 = sharc_iop_r(m_core->arg0);
+}
+
+void adsp21062_device::sharc_cfunc_write_iop()
+{
+	printf("sharc iop write %08X, %08X\n", m_core->arg1, m_core->arg0);
+	sharc_iop_w(m_core->arg0, m_core->arg1);
 }
 
 
@@ -205,10 +229,8 @@ void adsp21062_device::static_generate_memory_accessor(MEM_ACCESSOR_TYPE type, c
 			// 0x20000 ... 0x27fff
 			UML_AND(block, I1, I1, 0x7fff);								// and     i1,i1,0x7fff
 			UML_MULS(block, I1, I1, I1, 3);								// muls    i1,3
-			UML_DXOR(block, I0, I0, I0);								// dxor    i0,i0,i0
-			UML_DLOAD(block, I2, block0, I1, SIZE_WORD, SCALE_x2);		// dload   i2,[block0],i1,word,scale_x2
-			UML_DSHL(block, I2, I2, 32);								// dshl    i2,i2,32
-			UML_DOR(block, I0, I0, I2);									// dor     i0,i0,i2
+			UML_DLOAD(block, I0, block0, I1, SIZE_WORD, SCALE_x2);		// dload   i0,[block0],i1,word,scale_x2
+			UML_DSHL(block, I0, I0, 32);								// dshl    i0,i0,32
 			UML_DLOAD(block, I2, block0_1, I1, SIZE_WORD, SCALE_x2);	// dload   i2,[block0_1],i1,word,scale_x2
 			UML_DSHL(block, I2, I2, 16);								// dshl    i2,i2,16
 			UML_DOR(block, I0, I0, I2);									// dor     i0,i0,i2
@@ -225,10 +247,8 @@ void adsp21062_device::static_generate_memory_accessor(MEM_ACCESSOR_TYPE type, c
 			// 0x28000  ... 0x3ffff
 			UML_AND(block, I1, I1, 0x7fff);								// and     i1,i1,0x7fff (block 1 is mirrored in 0x28000...2ffff, 0x30000...0x37fff and 0x38000...3ffff)
 			UML_MULS(block, I1, I1, I1, 3);								// muls    i1,3
-			UML_DXOR(block, I0, I0, I0);								// dxor    i0,i0,i0
-			UML_DLOAD(block, I2, block1, I1, SIZE_WORD, SCALE_x2);		// dload   i2,[block1],i1,word,scale_x2
-			UML_DSHL(block, I2, I2, 32);								// dshl    i2,i2,32
-			UML_DOR(block, I0, I0, I2);									// dor     i0,i0,i2
+			UML_DLOAD(block, I0, block1, I1, SIZE_WORD, SCALE_x2);		// dload   i0,[block1],i1,word,scale_x2
+			UML_DSHL(block, I0, I0, 32);								// dshl    i0,i0,32
 			UML_DLOAD(block, I2, block1_1, I1, SIZE_WORD, SCALE_x2);	// dload   i2,[block1_1],i1,word,scale_x2
 			UML_DSHL(block, I2, I2, 16);								// dshl    i2,i2,16
 			UML_DOR(block, I0, I0, I2);									// dor     i0,i0,i2
@@ -237,8 +257,6 @@ void adsp21062_device::static_generate_memory_accessor(MEM_ACCESSOR_TYPE type, c
 			UML_RET(block);												// ret
 
 			UML_LABEL(block, label++);									// label2:
-
-			// TODO: fatalerror?
 			break;
 
 		case MEM_ACCESSOR_PM_WRITE48:
@@ -345,7 +363,7 @@ void adsp21062_device::static_generate_memory_accessor(MEM_ACCESSOR_TYPE type, c
 			UML_JMPc(block, COND_BE, label);							// jbe     label1
 			// 0x80000 ...
 			UML_SHL(block, I1, I1, 2);									// shl     i1,i1,2
-			UML_READ(block, I0, I1, SIZE_WORD, SPACE_DATA);
+			UML_READ(block, I0, I1, SIZE_DWORD, SPACE_DATA);			// read    i0,i1,dword,SPACE_DATA
 			UML_RET(block);
 
 			UML_LABEL(block, label++);									// label1:
@@ -378,6 +396,85 @@ void adsp21062_device::static_generate_memory_accessor(MEM_ACCESSOR_TYPE type, c
 			UML_CMP(block, I1, IOP_REGISTER_END);						// cmp     i1,IOP_REGISTER_END
 			UML_JMPc(block, COND_A, label);								// ja      label4
 			// IOP registers
+			UML_MOV(block, mem(&m_core->arg0), I1);						// mov     [m_core->arg0],i1
+			UML_CALLC(block, cfunc_read_iop, this);						// callc   cfunc_read_iop
+			UML_MOV(block, I0, mem(&m_core->arg1));						// mov     i0,[m_core->arg1]
+			UML_RET(block);
+
+			UML_LABEL(block, label++);									// label4:
+			UML_CMP(block, I1, IRAM_SHORT_BLOCK0_START);				// cmp     i1,IRAM_SHORT_BLOCK0_START
+			UML_JMPc(block, COND_B, label+1);							// jb      label6
+			UML_CMP(block, I1, IRAM_SHORT_BLOCK0_END);					// cmp     i1,IRAM_SHORT_BLOCK0_END
+			UML_JMPc(block, COND_A, label+1);							// ja      label6
+			// 0x40000 ... 0x4ffff
+			UML_AND(block, I1, I1, 0xffff);								// and     i1,i1,0xffff
+			UML_XOR(block, I1, I1, 1);									// xor     i1,i1,1
+			UML_TEST(block, mem(&m_core->mode1), 0x4000);				// test    [m_core->mode1],0x4000
+			UML_JMPc(block, COND_Z, label);								// jz      label5
+			UML_LOADS(block, I0, block0, I1, SIZE_WORD, SCALE_x2);		// loads   i0,[block0],i1,word,scale_x2
+			UML_RET(block);
+			UML_LABEL(block, label++);									// label5:
+			UML_LOAD(block, I0, block0, I1, SIZE_WORD, SCALE_x2);		// load    i0,[block0],i1,word,scale_x2
+			UML_RET(block);
+
+			UML_LABEL(block, label++);									// label6:
+			UML_CMP(block, I1, IRAM_SHORT_BLOCK1_START);				// cmp     i1,IRAM_SHORT_BLOCK1_START
+			UML_JMPc(block, COND_B, label+1);							// jb      label8
+			UML_CMP(block, I1, IRAM_SHORT_BLOCK1_END);					// cmp     i1,IRAM_SHORT_BLOCK1_END
+			UML_JMPc(block, COND_A, label+1);							// ja      label8
+			// 0x50000 ... 0x7ffff
+			UML_AND(block, I1, I1, 0xffff);								// and     i1,i1,0xffff
+			UML_XOR(block, I1, I1, 1);									// xor     i1,i1,1
+			UML_TEST(block, mem(&m_core->mode1), 0x4000);				// test    [m_core->mode1],0x4000
+			UML_JMPc(block, COND_Z, label);								// jz      label7
+			UML_LOADS(block, I0, block1, I1, SIZE_WORD, SCALE_x2);		// loads   i0,[block1],i1,word,scale_x2
+			UML_RET(block);
+			UML_LABEL(block, label++);									// label7:
+			UML_LOAD(block, I0, block1, I1, SIZE_WORD, SCALE_x2);		// load    i0,[block1],i1,word,scale_x2
+			UML_RET(block);
+
+			UML_LABEL(block, label++);									// label8:
+			break;
+
+		case MEM_ACCESSOR_DM_WRITE32:
+			UML_CMP(block, I1, IRAM_END);								// cmp     i1,IRAM_END
+			UML_JMPc(block, COND_BE, label);							// jbe     label1
+			// 0x80000 ...
+			UML_SHL(block, I1, I1, 2);									// shl     i1,i1,2
+			UML_WRITE(block, I1, I0, SIZE_DWORD, SPACE_DATA);			// write   i1,i0,dword,SPACE_DATA
+			UML_RET(block);
+
+			UML_LABEL(block, label++);									// label1:
+			UML_CMP(block, I1, IRAM_BLOCK0_START);						// cmp     i1,IRAM_BLOCK0_START
+			UML_JMPc(block, COND_B, label);								// jb      label2
+			UML_CMP(block, I1, IRAM_BLOCK0_END);						// cmp     i1,IRAM_BLOCK0_END
+			UML_JMPc(block, COND_A, label);								// ja      label2
+			// 0x20000 ... 0x27fff
+			UML_AND(block, I1, I1, 0x7fff);								// and     i1,i1,0x7fff
+			UML_STORE(block, block0_1, I1, I0, SIZE_WORD, SCALE_x4);	// store   [block0_1],i1,i0,word,scale_x4
+			UML_SHR(block, I0, I0, 16);									// shr     i0,i0,16
+			UML_STORE(block, block0, I1, I0, SIZE_WORD, SCALE_x4);		// store   [block0],i1,i0,word,scale_x4
+			UML_RET(block);
+
+			UML_LABEL(block, label++);									// label2:
+			UML_CMP(block, I1, IRAM_BLOCK1_START);						// cmp     i1,IRAM_BLOCK1_START
+			UML_JMPc(block, COND_B, label);								// jb      label3
+			UML_CMP(block, I1, IRAM_BLOCK1_END);						// cmp     i1,IRAM_BLOCK1_END
+			UML_JMPc(block, COND_A, label);								// ja      label3
+			// 0x28000 ... 0x3ffff
+			UML_AND(block, I1, I1, 0x7fff);								// and     i1,i1,0x7fff
+			UML_STORE(block, block1_1, I1, I0, SIZE_WORD, SCALE_x4);	// store   [block1_1],i1,i0,word,scale_x4
+			UML_SHR(block, I0, I0, 16);									// shr     i0,i0,16
+			UML_STORE(block, block1, I1, I0, SIZE_WORD, SCALE_x4);		// store   [block1],i1,i0,word,scale_x4
+			UML_RET(block);
+
+			UML_LABEL(block, label++);									// Label3:
+			UML_CMP(block, I1, IOP_REGISTER_END);						// cmp     i1,IOP_REGISTER_END
+			UML_JMPc(block, COND_A, label);								// ja      label4
+			// IOP registers
+			UML_MOV(block, mem(&m_core->arg0), I1);						// mov     [m_core->arg0],i1
+			UML_MOV(block, mem(&m_core->arg1), I0);						// mov     [m_core->arg1],i0
+			UML_CALLC(block, cfunc_write_iop, this);					// callc   cfunc_write_iop
 			UML_RET(block);
 
 			UML_LABEL(block, label++);									// label4:
@@ -386,6 +483,9 @@ void adsp21062_device::static_generate_memory_accessor(MEM_ACCESSOR_TYPE type, c
 			UML_CMP(block, I1, IRAM_SHORT_BLOCK0_END);					// cmp     i1,IRAM_SHORT_BLOCK0_END
 			UML_JMPc(block, COND_A, label);								// ja      label5
 			// 0x40000 ... 0x4ffff
+			UML_AND(block, I1, I1, 0xffff);								// and     i1,i1,0xffff
+			UML_XOR(block, I1, I1, 1);									// xor     i1,i1,1
+			UML_STORE(block, block0, I1, I0, SIZE_WORD, SCALE_x2);		// store   [block0],i1,i0,word,scale_x2
 			UML_RET(block);
 
 			UML_LABEL(block, label++);									// label5:
@@ -394,12 +494,12 @@ void adsp21062_device::static_generate_memory_accessor(MEM_ACCESSOR_TYPE type, c
 			UML_CMP(block, I1, IRAM_SHORT_BLOCK1_END);					// cmp     i1,IRAM_SHORT_BLOCK1_END
 			UML_JMPc(block, COND_A, label);								// ja      label6
 			// 0x50000 ... 0x7ffff
+			UML_AND(block, I1, I1, 0xffff);								// and     i1,i1,0xffff
+			UML_XOR(block, I1, I1, 1);									// xor     i1,i1,1
+			UML_STORE(block, block1, I1, I0, SIZE_WORD, SCALE_x2);		// store   [block1],i1,i0,word,scale_x2
 			UML_RET(block);
 
 			UML_LABEL(block, label++);									// label6:
-			break;
-
-		case MEM_ACCESSOR_DM_WRITE32:
 			break;
 	}
 

@@ -99,6 +99,8 @@ public:
 	TIMER_CALLBACK_MEMBER(sharc_dma_callback);
 
 	void sharc_cfunc_unimplemented();
+	void sharc_cfunc_read_iop();
+	void sharc_cfunc_write_iop();
 
 	enum ASTAT_FLAGS
 	{
