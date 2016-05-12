@@ -57,7 +57,22 @@ using namespace uml;
 #define FLAG3							mem(&m_core->flag[3])
 #define CURLCNTR						mem(&m_core->curlcntr)
 
-#define ASTAT_CALC_REQUIRED				desc->regreq[0] & 0x10000
+//#define ASTAT_CALC_REQUIRED				desc->regreq[0] & 0x10000
+#define AZ_CALC_REQUIRED				desc->regreq[0] & 0x00010000
+#define AV_CALC_REQUIRED				desc->regreq[0] & 0x00020000
+#define AN_CALC_REQUIRED				desc->regreq[0] & 0x00040000
+#define AC_CALC_REQUIRED				desc->regreq[0] & 0x00080000
+#define AS_CALC_REQUIRED				desc->regreq[0] & 0x00100000
+#define AI_CALC_REQUIRED				desc->regreq[0] & 0x00200000
+#define MN_CALC_REQUIRED				desc->regreq[0] & 0x00400000
+#define MV_CALC_REQUIRED				desc->regreq[0] & 0x00800000
+#define MU_CALC_REQUIRED				desc->regreq[0] & 0x01000000
+#define MI_CALC_REQUIRED				desc->regreq[0] & 0x02000000
+#define SV_CALC_REQUIRED				desc->regreq[0] & 0x04000000
+#define SZ_CALC_REQUIRED				desc->regreq[0] & 0x08000000
+#define SS_CALC_REQUIRED				desc->regreq[0] & 0x10000000
+#define BTF_CALC_REQUIRED				desc->regreq[0] & 0x20000000
+#define AF_CALC_REQUIRED				desc->regreq[0] & 0x40000000
 
 
 #define IRAM_BLOCK0_START				0x20000
@@ -1522,14 +1537,12 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 
 					case 0x42:		// Rn = Rx XOR Ry
 						UML_XOR(block, REG(rn), REG(rx), REG(ry));
-						if (ASTAT_CALC_REQUIRED)
-						{
-							UML_DMOV(block, mem(&m_core->astat_drc.flags64[0]), 0);
-							UML_DMOV(block, mem(&m_core->astat_drc.flags64[1]), 0);
-							UML_DMOV(block, mem(&m_core->astat_drc.flags64[2]), 0);
-							UML_SETc(block, COND_Z, ASTAT_AZ);
-							UML_SETc(block, COND_S, ASTAT_AN);
-						}
+						if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_AZ);
+						if (AN_CALC_REQUIRED) UML_SETc(block, COND_S, ASTAT_AN);
+						if (AV_CALC_REQUIRED) UML_MOV(block, ASTAT_AV, 0);
+						if (AC_CALC_REQUIRED) UML_MOV(block, ASTAT_AC, 0);
+						if (AS_CALC_REQUIRED) UML_MOV(block, ASTAT_AS, 0);
+						if (AI_CALC_REQUIRED) UML_MOV(block, ASTAT_AI, 0);
 						return TRUE;
 
 					default:
@@ -1898,11 +1911,10 @@ int adsp21062_device::generate_shift_imm(drcuml_block *block, compiler_state *co
 			return FALSE;
 
 		case 0x02:		// ROT Rx BY <data8>
-			UML_ROL(block, REG(rn), REG(rx), (shift < 0) ? 31 - ((-shift) & 0x1f) : shift & 0x1f);
-			if (ASTAT_CALC_REQUIRED)
-			{
-				UML_SETc(block, COND_Z, ASTAT_SZ);
-			}
+			UML_ROL(block, REG(rn), REG(rx), (shift < 0) ? 31 - ((-shift) & 0x1f) : shift & 0x1f);			
+			if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
+			if (SV_CALC_REQUIRED) UML_MOV(block, ASTAT_SV, 0);
+			if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
 			return TRUE;
 
 		default:

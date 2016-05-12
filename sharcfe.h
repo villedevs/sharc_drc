@@ -18,7 +18,7 @@
 class sharc_frontend : public drc_frontend
 {
 public:
-	sharc_frontend(adsp21062_device &sharc, UINT32 window_start, UINT32 window_end, UINT32 max_sequence);
+	sharc_frontend(adsp21062_device *sharc, UINT32 window_start, UINT32 window_end, UINT32 max_sequence);
 
 	enum UREG_ACCESS
 	{
@@ -34,9 +34,9 @@ private:
 	bool describe_compute(opcode_desc &desc, UINT64 opcode);
 	bool describe_ureg_access(opcode_desc &desc, int reg, UREG_ACCESS access);
 	bool describe_shiftop_imm(opcode_desc &desc, int shiftop, int rn, int rx);
+	void describe_if_condition(opcode_desc &desc, int condition);
 
-
-	adsp21062_device &m_sharc;
+	adsp21062_device *m_sharc;
 };
 
 #endif /* __SHARCFE_H__ */

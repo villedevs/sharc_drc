@@ -367,7 +367,7 @@ void adsp21062_device::device_start()
 	m_drcuml->symbol_add(&m_core->arg2, sizeof(m_core->arg2), "arg2");
 	m_drcuml->symbol_add(&m_core->arg3, sizeof(m_core->arg3), "arg3");
 
-	m_drcfe = std::make_unique<sharc_frontend>(*this, COMPILE_BACKWARDS_BYTES, COMPILE_FORWARDS_BYTES, COMPILE_MAX_SEQUENCE);
+	m_drcfe = std::make_unique<sharc_frontend>(this, COMPILE_BACKWARDS_BYTES, COMPILE_FORWARDS_BYTES, COMPILE_MAX_SEQUENCE);
 
 	for (int i = 0; i < 16; i++)
 	{

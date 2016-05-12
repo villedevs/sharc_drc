@@ -13,8 +13,44 @@
 #define REG_USED(desc,x)			do { (desc).regin[0] |= 1 << (x); } while(0)
 #define REG_MODIFIED(desc,x)		do { (desc).regout[0] |= 1 << (x); } while(0)
 
-#define ASTAT_USED(desc)			do { (desc).regin[0] |= 1 << 16; } while(0)
-#define ASTAT_MODIFIED(desc)		do { (desc).regout[0] |= 1 << 16; } while(0)
+//#define ASTAT_USED(desc)			do { (desc).regin[0] |= 1 << 16; } while(0)
+//#define ASTAT_MODIFIED(desc)		do { (desc).regout[0] |= 1 << 16; } while(0)
+
+#define AZ_USED(desc)				do { (desc).regin[0] |= 1 << 16; } while(0)
+#define AZ_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 16; } while(0)
+#define AV_USED(desc)				do { (desc).regin[0] |= 1 << 17; } while(0)
+#define AV_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 17; } while(0)
+#define AN_USED(desc)				do { (desc).regin[0] |= 1 << 18; } while(0)
+#define AN_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 18; } while(0)
+#define AC_USED(desc)				do { (desc).regin[0] |= 1 << 19; } while(0)
+#define AC_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 19; } while(0)
+#define AS_USED(desc)				do { (desc).regin[0] |= 1 << 20; } while(0)
+#define AS_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 20; } while(0)
+#define AI_USED(desc)				do { (desc).regin[0] |= 1 << 21; } while(0)
+#define AI_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 21; } while(0)
+#define MN_USED(desc)				do { (desc).regin[0] |= 1 << 22; } while(0)
+#define MN_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 22; } while(0)
+#define MV_USED(desc)				do { (desc).regin[0] |= 1 << 23; } while(0)
+#define MV_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 23; } while(0)
+#define MU_USED(desc)				do { (desc).regin[0] |= 1 << 24; } while(0)
+#define MU_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 24; } while(0)
+#define MI_USED(desc)				do { (desc).regin[0] |= 1 << 25; } while(0)
+#define MI_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 25; } while(0)
+#define SV_USED(desc)				do { (desc).regin[0] |= 1 << 26; } while(0)
+#define SV_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 26; } while(0)
+#define SZ_USED(desc)				do { (desc).regin[0] |= 1 << 27; } while(0)
+#define SZ_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 27; } while(0)
+#define SS_USED(desc)				do { (desc).regin[0] |= 1 << 28; } while(0)
+#define SS_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 28; } while(0)
+#define BTF_USED(desc)				do { (desc).regin[0] |= 1 << 29; } while(0)
+#define BTF_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 29; } while(0)
+#define AF_USED(desc)				do { (desc).regin[0] |= 1 << 30; } while(0)
+#define AF_MODIFIED(desc)			do { (desc).regout[0] |= 1 << 30; } while(0)
+
+#define ALU_FLAGS_MODIFIED(desc)	do { AZ_MODIFIED(desc);AN_MODIFIED(desc);AV_MODIFIED(desc);AC_MODIFIED(desc);AS_MODIFIED(desc);AI_MODIFIED(desc); } while(0)
+#define MULT_FLAGS_MODIFIED(desc)	do { MN_MODIFIED(desc);MV_MODIFIED(desc);MU_MODIFIED(desc);MI_MODIFIED(desc); } while(0)
+#define SHIFT_FLAGS_MODIFIED(desc)	do { SZ_MODIFIED(desc);SV_MODIFIED(desc);SS_MODIFIED(desc); } while(0)
+
 
 #define PM_I_USED(desc,x)			do { (desc).regin[1] |= 1 << (x); } while(0)
 #define PM_I_MODIFIED(desc,x)		do { (desc).regout[1] |= 1 << (x); } while(0)
@@ -39,7 +75,7 @@
 #define SIGN_EXTEND24(x)			(((x) & 0x800000) ? (0xff000000 | (x)) : (x))
 
 
-sharc_frontend::sharc_frontend(adsp21062_device &sharc, UINT32 window_start, UINT32 window_end, UINT32 max_sequence)
+sharc_frontend::sharc_frontend(adsp21062_device *sharc, UINT32 window_start, UINT32 window_end, UINT32 max_sequence)
 	: drc_frontend(*sharc, window_start, window_end, max_sequence),
 		m_sharc(sharc)
 {
@@ -49,7 +85,7 @@ sharc_frontend::sharc_frontend(adsp21062_device &sharc, UINT32 window_start, UIN
 bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 {
 	//UINT64 opcode = desc.opptr.q[0] = m_sharc.m_direct->read_qword(desc.physpc, 0);
-	UINT64 opcode = desc.opptr.q[0] = m_sharc.pm_read48(desc.physpc);
+	UINT64 opcode = desc.opptr.q[0] = m_sharc->pm_read48(desc.physpc);
 
 	desc.length = 1;
 	desc.cycles = 1;
@@ -74,18 +110,23 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					break;				
 
 				case 0x01:			// compute								|000|00001|
+				{
+					int cond = (opcode >> 33) & 0x1f;
+					describe_if_condition(desc, cond);
+
 					if (!describe_compute(desc, opcode))
 						return false;
-					ASTAT_USED(desc);
 					break;
+				}
 
 				case 0x02:			// immediate shift						|000|00010|
 				{
 					int shiftop = (opcode >> 16) & 0x3f;
 					int rn = (opcode >> 4) & 0xf;
 					int rx = (opcode & 0xf);
+					int cond = (opcode >> 33) & 0x1f;
 
-					ASTAT_USED(desc);
+					describe_if_condition(desc, cond);
 
 					if (!describe_shiftop_imm(desc, shiftop, rn, rx))
 						return false;
@@ -97,11 +138,12 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					int g = (opcode >> 38) & 0x1;
 					int m = (opcode >> 27) & 0x7;
 					int i = (opcode >> 30) & 0x7;
+					int cond = (opcode >> 33) & 0x1f;
+
+					describe_if_condition(desc, cond);
 
 					if (!describe_compute(desc, opcode))
 						return false;
-
-					ASTAT_USED(desc);
 
 					if (g)
 					{
@@ -126,13 +168,12 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					int cond = (opcode >> 33) & 0x1f;
 					UINT32 address = opcode & 0xffffff;
 
-					if (m_sharc.if_condition_always_true(cond))
+					if (m_sharc->if_condition_always_true(cond))
 						desc.flags |= OPFLAG_IS_UNCONDITIONAL_BRANCH | OPFLAG_END_SEQUENCE;
 					else
 						desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
 
-					if (m_sharc.if_condition_astat(cond))
-						ASTAT_USED(desc);
+					describe_if_condition(desc, cond);
 
 					desc.targetpc = address;
 					desc.delayslots = (j) ? 2 : 0;
@@ -145,13 +186,12 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					int cond = (opcode >> 33) & 0x1f;
 					UINT32 address = opcode & 0xffffff;
 
-					if (m_sharc.if_condition_always_true(cond))
+					if (m_sharc->if_condition_always_true(cond))
 						desc.flags |= OPFLAG_IS_UNCONDITIONAL_BRANCH | OPFLAG_END_SEQUENCE;
 					else
 						desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
 
-					if (m_sharc.if_condition_astat(cond))
-						ASTAT_USED(desc);
+					describe_if_condition(desc, cond);
 
 					desc.targetpc = desc.pc + SIGN_EXTEND24(address);
 					desc.delayslots = (j) ? 2 : 0;
@@ -168,13 +208,12 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					if (!describe_compute(desc, opcode))
 						return false;
 
-					if (m_sharc.if_condition_always_true(cond))
+					if (m_sharc->if_condition_always_true(cond))
 						desc.flags |= OPFLAG_IS_UNCONDITIONAL_BRANCH | OPFLAG_END_SEQUENCE;
 					else
 						desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
 
-					if (m_sharc.if_condition_astat(cond))
-						ASTAT_USED(desc);
+					describe_if_condition(desc, cond);
 
 					PM_I_USED(desc, pmi);
 					PM_M_USED(desc, pmm);
@@ -192,13 +231,12 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					if (!describe_compute(desc, opcode))
 						return false;
 
-					if (m_sharc.if_condition_always_true(cond))
+					if (m_sharc->if_condition_always_true(cond))
 						desc.flags |= OPFLAG_IS_UNCONDITIONAL_BRANCH | OPFLAG_END_SEQUENCE;
 					else
 						desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
 
-					if (m_sharc.if_condition_astat(cond))
-						ASTAT_USED(desc);
+					describe_if_condition(desc, cond);
 
 					desc.targetpc = desc.pc + SIGN_EXTEND6((opcode >> 27) & 0x3f);
 					desc.delayslots = (j) ? 2 : 0;
@@ -214,13 +252,12 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					if (!describe_compute(desc, opcode))
 						return false;
 
-					if (m_sharc.if_condition_always_true(cond))
+					if (m_sharc->if_condition_always_true(cond))
 						desc.flags |= OPFLAG_IS_UNCONDITIONAL_BRANCH | OPFLAG_END_SEQUENCE;
 					else
 						desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
 
-					if (m_sharc.if_condition_astat(cond))
-						ASTAT_USED(desc);
+					describe_if_condition(desc, cond);
 
 					desc.targetpc = BRANCH_TARGET_DYNAMIC;
 					desc.delayslots = (j) ? 2 : 0;
@@ -235,13 +272,12 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					if (!describe_compute(desc, opcode))
 						return false;
 
-					if (m_sharc.if_condition_always_true(cond))
+					if (m_sharc->if_condition_always_true(cond))
 						desc.flags |= OPFLAG_IS_UNCONDITIONAL_BRANCH | OPFLAG_END_SEQUENCE;
 					else
 						desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
 
-					if (m_sharc.if_condition_astat(cond))
-						ASTAT_USED(desc);
+					describe_if_condition(desc, cond);
 
 					desc.targetpc = BRANCH_TARGET_DYNAMIC;
 					desc.delayslots = (j) ? 2 : 0;
@@ -303,23 +339,81 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 				{
 					int bop = (opcode >> 37) & 0x7;
 					int sreg = (opcode >> 32) & 0xf;
+					UINT32 data = (UINT32)(opcode);
 
 					switch (bop)
 					{
 						case 0:		// SET
 						case 1:		// CLEAR
 						case 2:		// TOGGLE
-							if (sreg == 0x7c)
+							if (sreg == 0x7c)	// ASTAT
 							{
-								ASTAT_USED(desc);
-								ASTAT_MODIFIED(desc);
+								if (data & adsp21062_device::AZ)
+								{
+									AZ_USED(desc); AZ_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::AV)
+								{
+									AV_USED(desc); AV_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::AN)
+								{
+									AN_USED(desc); AN_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::AC)
+								{
+									AC_USED(desc); AC_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::AS)
+								{
+									AS_USED(desc); AS_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::AI)
+								{
+									AI_USED(desc); AI_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::MN)
+								{
+									MN_USED(desc); MN_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::MV)
+								{
+									MV_USED(desc); MV_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::MU)
+								{
+									MU_USED(desc); MU_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::MI)
+								{
+									MI_USED(desc); MI_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::SV)
+								{
+									SV_USED(desc); SV_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::SZ)
+								{
+									SZ_USED(desc); SZ_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::SS)
+								{
+									SS_USED(desc); SS_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::BTF)
+								{
+									BTF_USED(desc); BTF_MODIFIED(desc);
+								}
+								if (data & adsp21062_device::AF)
+								{
+									AF_USED(desc); AF_MODIFIED(desc);
+								}
 							}
 							break;
 
 						case 4:		// TEST
 						case 5:		// XOR
-							ASTAT_USED(desc);
-							ASTAT_MODIFIED(desc);
+							BTF_MODIFIED(desc);
 							break;
 
 						default:
@@ -417,14 +511,14 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 			if (!describe_compute(desc, opcode))
 				return false;
 
-			ASTAT_USED(desc);
-
 			int i = (opcode >> 41) & 0x7;
 			int m = (opcode >> 38) & 0x7;
 			int cond = (opcode >> 33) & 0x1f;
 			int g = (opcode >> 32) & 0x1;
 			int d = (opcode >> 31) & 0x1;
 			int ureg = (opcode >> 23) & 0xff;
+
+			describe_if_condition(desc, cond);
 
 			if (d)
 			{
@@ -460,12 +554,13 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 			if (!describe_compute(desc, opcode))
 				return false;
 
-			ASTAT_USED(desc);
-
 			if (opcode & U64(0x100000000000))	// compute / ureg <-> ureg							|011|1|
 			{
 				int src_ureg = (opcode >> 36) & 0xff;
 				int dst_ureg = (opcode >> 23) & 0xff;
+				int cond = (opcode >> 31) & 0x1f;
+
+				describe_if_condition(desc, cond);
 
 				if (!describe_ureg_access(desc, src_ureg, UREG_READ))
 					return false;
@@ -478,6 +573,9 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 				int d = (opcode >> 39) & 0x1;
 				int dreg = (opcode >> 23) & 0xf;
 				int i = (opcode >> 41) & 0x7;
+				int cond = (opcode >> 33) & 0x1f;
+
+				describe_if_condition(desc, cond);
 
 				if (d)
 				{
@@ -535,8 +633,9 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 				int shiftop = (opcode >> 16) & 0x3f;
 				int rn = (opcode >> 4) & 0xf;
 				int rx = (opcode & 0xf);
+				int cond = (opcode >> 33) & 0x1f;
 
-				ASTAT_USED(desc);
+				describe_if_condition(desc, cond);
 
 				if (!describe_shiftop_imm(desc, shiftop, rn, rx))
 					return false;
@@ -610,13 +709,12 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 			if (!describe_compute(desc, opcode))
 				return false;
 
-			if (m_sharc.if_condition_always_true(cond))
+			if (m_sharc->if_condition_always_true(cond))
 				desc.flags |= OPFLAG_IS_UNCONDITIONAL_BRANCH | OPFLAG_END_SEQUENCE;
 			else
 				desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
 
-			if (m_sharc.if_condition_astat(cond))
-				ASTAT_USED(desc);
+			describe_if_condition(desc, cond);
 
 			PM_I_USED(desc, pmi);
 			PM_M_USED(desc, pmm);
@@ -651,13 +749,12 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 			if (!describe_compute(desc, opcode))
 				return false;
 
-			if (m_sharc.if_condition_always_true(cond))
+			if (m_sharc->if_condition_always_true(cond))
 				desc.flags |= OPFLAG_IS_UNCONDITIONAL_BRANCH | OPFLAG_END_SEQUENCE;
 			else
 				desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
 
-			if (m_sharc.if_condition_astat(cond))
-				ASTAT_USED(desc);
+			describe_if_condition(desc, cond);
 
 			DM_I_USED(desc, dmi);
 			DM_I_MODIFIED(desc, dmi);
@@ -713,7 +810,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 				REG_USED(desc, ry);
 				REG_MODIFIED(desc, ra);
 				REG_MODIFIED(desc, rs);
-				ASTAT_MODIFIED(desc);
+				ALU_FLAGS_MODIFIED(desc);
 				break;
 
 			case 0x04:			// Rm = R3-0 * R7-4 (SSFR),   Ra = R11-8 + R15-12
@@ -725,7 +822,8 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 				REG_USED(desc, fya);
 				REG_MODIFIED(desc, fm);
 				REG_MODIFIED(desc, fa);
-				ASTAT_MODIFIED(desc);
+				ALU_FLAGS_MODIFIED(desc);
+				MULT_FLAGS_MODIFIED(desc);
 				break;
 
 			case 0x08:			// MRF = MRF + R3-0 * R7-4 (SSF),   Ra = R11-8 + R15-12
@@ -735,7 +833,8 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 				REG_USED(desc, fym);
 				REG_USED(desc, fxa);
 				REG_USED(desc, fya);
-				ASTAT_MODIFIED(desc);
+				ALU_FLAGS_MODIFIED(desc);
+				MULT_FLAGS_MODIFIED(desc);
 				break;
 
 			case 0x0c:			// Rm = MRF + R3-0 * R7-4 (SSFR),   Ra = R11-8 + R15-12
@@ -747,7 +846,8 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 				REG_USED(desc, fya);
 				REG_MODIFIED(desc, fm);
 				REG_MODIFIED(desc, fa);
-				ASTAT_MODIFIED(desc);
+				ALU_FLAGS_MODIFIED(desc);
+				MULT_FLAGS_MODIFIED(desc);
 				break;
 
 			case 0x10:			// MRF = MRF - R3-0 * R7-4 (SSF),   Ra = R11-8 + R15-12
@@ -757,7 +857,8 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 				REG_USED(desc, fym);
 				REG_USED(desc, fxa);
 				REG_USED(desc, fya);
-				ASTAT_MODIFIED(desc);
+				ALU_FLAGS_MODIFIED(desc);
+				MULT_FLAGS_MODIFIED(desc);
 				break;
 
 			case 0x14:			// Rm = MRF - R3-0 * R7-4 (SSFR),   Ra = R11-8 + R15-12
@@ -769,7 +870,8 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 				REG_USED(desc, fya);
 				REG_MODIFIED(desc, fm);
 				REG_MODIFIED(desc, fa);
-				ASTAT_MODIFIED(desc);
+				ALU_FLAGS_MODIFIED(desc);
+				MULT_FLAGS_MODIFIED(desc);
 				break;
 
 			case 0x18:			// Fm = F3-0 * F7-4,   Fa = F11-8 + F15-12
@@ -785,7 +887,8 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 				REG_USED(desc, fya);
 				REG_MODIFIED(desc, fm);
 				REG_MODIFIED(desc, fa);
-				ASTAT_MODIFIED(desc);
+				ALU_FLAGS_MODIFIED(desc);
+				MULT_FLAGS_MODIFIED(desc);
 				break;
 
 			case 0x1d:			// Fm = F3-0 * F7-4,   Fa = ABS F11-8
@@ -794,7 +897,8 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 				REG_USED(desc, fxa);
 				REG_MODIFIED(desc, fm);
 				REG_MODIFIED(desc, fa);
-				ASTAT_MODIFIED(desc);
+				ALU_FLAGS_MODIFIED(desc);
+				MULT_FLAGS_MODIFIED(desc);
 				break;
 
 			case 0x20: case 0x21: case 0x22: case 0x23: case 0x24: case 0x25: case 0x26: case 0x27:
@@ -807,6 +911,8 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 				REG_MODIFIED(desc, fm);
 				REG_MODIFIED(desc, fa);
 				REG_MODIFIED(desc, (opcode >> 16) & 0xf);
+				ALU_FLAGS_MODIFIED(desc);
+				MULT_FLAGS_MODIFIED(desc);
 				break;
 
 			case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37:
@@ -819,6 +925,8 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 				REG_MODIFIED(desc, fm);
 				REG_MODIFIED(desc, fa);
 				REG_MODIFIED(desc, (opcode >> 16) & 0xf);
+				ALU_FLAGS_MODIFIED(desc);
+				MULT_FLAGS_MODIFIED(desc);
 				break;
 
 			default:
@@ -861,7 +969,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);
+						ALU_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x05:		// Rn = Rx + Ry + CI
@@ -871,15 +979,15 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
 						REG_MODIFIED(desc, rn);
-						ASTAT_USED(desc);
-						ASTAT_MODIFIED(desc);
+						AC_USED(desc);
+						ALU_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x0a:		// COMP(Rx, Ry)
 					case 0x8a:		// COMP(Fx, Fy)
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
-						ASTAT_MODIFIED(desc);
+						ALU_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x29:		// Rn = Rx + 1
@@ -900,7 +1008,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 					case 0xc5:		// Fn = RSQRTS Fx
 						REG_USED(desc, rx);
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);
+						ALU_FLAGS_MODIFIED(desc);
 						break;
 
 					default:
@@ -929,7 +1037,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x44:		// MRF = Rx * Ry (UUI)
@@ -947,7 +1055,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						// TODO: track MRF?
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x46:		// MRB = Rx * Ry (UUI)
@@ -965,7 +1073,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						// TODO: track MRB?
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x80:		// Rn = MRF + Rx * Ry (UUI)
@@ -984,7 +1092,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x82:		// Rn = MRB + Rx * Ry (UUI)
@@ -1003,7 +1111,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x84:		// MRF = MRF + Rx * Ry (UUI)
@@ -1021,7 +1129,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						// TODO: track MRF?
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x86:		// MRB = MRB + Rx * Ry (UUI)
@@ -1040,7 +1148,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						// TODO: track MRB?
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 					
 					case 0xc0:		// Rn = MRF - Rx * Ry (UUI)
@@ -1059,7 +1167,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0xc2:		// Rn = MRB - Rx * Ry (UUI)
@@ -1078,7 +1186,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0xc4:		// MRF = MRF - Rx * Ry (UUI)
@@ -1096,7 +1204,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						// TODO: track MRF?
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0xc6:		// MRB = MRB - Rx * Ry (UUI)
@@ -1114,7 +1222,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						// TODO: track MRB?
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 					
 					case 0x00:		// Rn = SAT MRF (UI)
@@ -1123,7 +1231,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 					case 0x09:		// Rn = SAT MRF (SF)
 						// TODO: track MRF?
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x02:		// Rn = SAT MRB (UI)
@@ -1132,7 +1240,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 					case 0x0b:		// Rn = SAT MRB (SF)
 						// TODO: track MRB?
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x04:		// MRF = SAT MRF (UI)
@@ -1140,7 +1248,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 					case 0x0c:		// MRF = SAT MRF (UF)
 					case 0x0d:		// MRF = SAT MRF (SF)
 						// TODO: track MRF?
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x06:		// MRB = SAT MRB (UI)
@@ -1148,43 +1256,43 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 					case 0x0e:		// MRB = SAT MRB (UF)
 					case 0x0f:		// MRB = SAT MRB (SF)
 						// TODO: track MRB?
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x18:		// Rn = RND MRF (U)
 					case 0x19:		// Rn = RND MRF (S)
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x1a:		// Rn = RND MRB (U)
 					case 0x1b:		// Rn = RND MRB (S)
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x1c:		// MRF = RND MRF (U)
 					case 0x1d:		// MRF = RND MRF (S)
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x1e:		// MRB = RND MRB (U)
 					case 0x1f:		// MRB = RND MRB (S)
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x14:		// MRF = 0
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 					case 0x16:		// MRB = 0
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x30:		// Fn = Fx * Fy
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: mult flags only
+						MULT_FLAGS_MODIFIED(desc);
 						break;
 
 					default:
@@ -1209,7 +1317,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: shift flags only
+						SHIFT_FLAGS_MODIFIED(desc);
 						break;
 
 					case 0x20:		// Rn = Rn OR LSHIFT Rx BY Ry | <data8>
@@ -1220,13 +1328,13 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						REG_USED(desc, ry);
 						REG_USED(desc, rn);
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: shift flags only
+						SHIFT_FLAGS_MODIFIED(desc);
 						break;
 					
 					case 0xcc:		// BTST Rx BY Ry | <data8>
 						REG_USED(desc, rx);
 						REG_USED(desc, ry);
-						ASTAT_MODIFIED(desc);		// TODO: shift flags only
+						SHIFT_FLAGS_MODIFIED(desc);
 						break;
 				
 					case 0x80:		// Rn = EXP Rx
@@ -1237,7 +1345,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 					case 0x94:		// Fn = FUNPACK Rx
 						REG_USED(desc, rx);
 						REG_MODIFIED(desc, rn);
-						ASTAT_MODIFIED(desc);		// TODO: shift flags only
+						SHIFT_FLAGS_MODIFIED(desc);
 						break;
 
 					default:
@@ -1348,9 +1456,31 @@ bool sharc_frontend::describe_ureg_access(opcode_desc &desc, int reg, UREG_ACCES
 
 		case 0x7c:		// ASTAT
 			if (access == UREG_READ)
-				ASTAT_USED(desc);
+			{
+				AZ_USED(desc);
+				AN_USED(desc);
+				AV_USED(desc);
+				AC_USED(desc);
+				AS_USED(desc);
+				AI_USED(desc);
+				MN_USED(desc);
+				MV_USED(desc);
+				MU_USED(desc);
+				MI_USED(desc);
+				SV_USED(desc);
+				SZ_USED(desc);
+				SS_USED(desc);
+				BTF_USED(desc);
+				AF_USED(desc);
+			}
 			else
-				ASTAT_MODIFIED(desc);
+			{
+				ALU_FLAGS_MODIFIED(desc);
+				MULT_FLAGS_MODIFIED(desc);
+				SHIFT_FLAGS_MODIFIED(desc);
+				BTF_MODIFIED(desc);
+				AF_MODIFIED(desc);
+			}
 			break;
 
 		case 0x7d:		// IMASK
@@ -1376,8 +1506,6 @@ bool sharc_frontend::describe_ureg_access(opcode_desc &desc, int reg, UREG_ACCES
 
 bool sharc_frontend::describe_shiftop_imm(opcode_desc &desc, int shiftop, int rn, int rx)
 {
-	ASTAT_MODIFIED(desc);
-
 	switch (shiftop)
 	{
 		case 0x00:		// LSHIFT Rx BY <data8>
@@ -1392,16 +1520,19 @@ bool sharc_frontend::describe_shiftop_imm(opcode_desc &desc, int shiftop, int rn
 		case 0x32:		// BTGL Rx BY <data8>
 			REG_USED(desc, rx);
 			REG_MODIFIED(desc, rn);
+			SHIFT_FLAGS_MODIFIED(desc);
 			break;
 
 		case 0x08:		// Rn = Rn OR LSHIFT Rx BY <data8>
 			REG_USED(desc, rx);
 			REG_USED(desc, rn);
 			REG_MODIFIED(desc, rn);
+			SHIFT_FLAGS_MODIFIED(desc);
 			break;
 
 		case 0x33:		// BTST Rx BY <data8>
 			REG_USED(desc, rx);
+			SHIFT_FLAGS_MODIFIED(desc);
 			break;
 
 		default:
@@ -1410,4 +1541,31 @@ bool sharc_frontend::describe_shiftop_imm(opcode_desc &desc, int shiftop, int rn
 	}
 
 	return true;
+}
+
+void sharc_frontend::describe_if_condition(opcode_desc &desc, int condition)
+{
+	switch (condition)
+	{
+		case 0x00:  AZ_USED(desc); break;                  /* EQ */
+		case 0x01:  AZ_USED(desc); AN_USED(desc); break;   /* LT */
+		case 0x02:  AZ_USED(desc); AN_USED(desc); break;   /* LE */
+		case 0x03:  AC_USED(desc); break;                  /* AC */
+		case 0x04:  AV_USED(desc); break;                  /* AV */
+		case 0x05:  MV_USED(desc); break;                  /* MV */
+		case 0x06:  MN_USED(desc); break;                  /* MS */
+		case 0x07:  SV_USED(desc); break;                  /* SV */
+		case 0x08:  SZ_USED(desc); break;                  /* SZ */
+		case 0x0d:  BTF_USED(desc); break;                 /* TF */
+		case 0x10:  AZ_USED(desc); break;                  /* NOT EQUAL */
+		case 0x11:  AZ_USED(desc); AN_USED(desc); break;   /* GE */
+		case 0x12:  AZ_USED(desc); AN_USED(desc); break;   /* GT */
+		case 0x13:  AC_USED(desc); break;                  /* NOT AC */
+		case 0x14:  AV_USED(desc); break;                  /* NOT AV */
+		case 0x15:  MV_USED(desc); break;                  /* NOT MV */
+		case 0x16:  MN_USED(desc); break;                  /* NOT MS */
+		case 0x17:  SV_USED(desc); break;                  /* NOT SV */
+		case 0x18:  SZ_USED(desc); break;                  /* NOT SZ */
+		case 0x1d:  BTF_USED(desc); break;                 /* NOT TF */
+	}
 }
