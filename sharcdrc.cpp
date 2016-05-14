@@ -899,7 +899,7 @@ void adsp21062_device::generate_read_ureg(drcuml_block *block, compiler_state *c
 		// REG 0-15
 		case 0x00: case 0x01: case 0x02: case 0x03: case 0x04: case 0x05: case 0x06: case 0x07:
 		case 0x08: case 0x09: case 0x0a: case 0x0b: case 0x0c: case 0x0d: case 0x0e: case 0x0f:
-			UML_MOV(block, I0, REG(ureg & 7));
+			UML_MOV(block, I0, REG(ureg & 0xf));
 			break;
 		// I0-7
 		case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x16: case 0x17:
@@ -988,7 +988,7 @@ void adsp21062_device::generate_write_ureg(drcuml_block *block, compiler_state *
 		// REG 0-15
 		case 0x00: case 0x01: case 0x02: case 0x03: case 0x04: case 0x05: case 0x06: case 0x07:
 		case 0x08: case 0x09: case 0x0a: case 0x0b: case 0x0c: case 0x0d: case 0x0e: case 0x0f:
-			UML_MOV(block, REG(ureg & 7), imm ? data : I0);
+			UML_MOV(block, REG(ureg & 0xf), imm ? data : I0);
 			break;
 		// I0-7
 		case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x16: case 0x17:
@@ -1016,10 +1016,14 @@ void adsp21062_device::generate_write_ureg(drcuml_block *block, compiler_state *
 			break;
 		// B0-7
 		case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x46: case 0x47:
+			// Note: loading B also loads the same value in I
 			UML_MOV(block, DM_B(ureg & 7), imm ? data : I0);
+			UML_MOV(block, DM_I(ureg & 7), imm ? data : I0);
 			break;
 		// B8-15
 		case 0x48: case 0x49: case 0x4a: case 0x4b: case 0x4c: case 0x4d: case 0x4e: case 0x4f:
+			// Note: loading B also loads the same value in I
+			UML_MOV(block, PM_B(ureg & 7), imm ? data : I0);
 			UML_MOV(block, PM_B(ureg & 7), imm ? data : I0);
 			break;
 
