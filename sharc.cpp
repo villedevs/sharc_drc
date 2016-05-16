@@ -356,6 +356,29 @@ void adsp21062_device::device_start()
 		char buf[10];
 		sprintf(buf, "r%d", i);
 		m_drcuml->symbol_add(&m_core->r[i], sizeof(m_core->r[i]), buf);
+
+		if (i < 8)
+		{
+			sprintf(buf, "dag_i%d", i);
+			m_drcuml->symbol_add(&m_core->dag1.i[i & 7], sizeof(m_core->dag1.i[i & 7]), buf);
+			sprintf(buf, "dag_m%d", i);
+			m_drcuml->symbol_add(&m_core->dag1.m[i & 7], sizeof(m_core->dag1.m[i & 7]), buf);
+			sprintf(buf, "dag_l%d", i);
+			m_drcuml->symbol_add(&m_core->dag1.l[i & 7], sizeof(m_core->dag1.l[i & 7]), buf);
+			sprintf(buf, "dag_b%d", i);
+			m_drcuml->symbol_add(&m_core->dag1.b[i & 7], sizeof(m_core->dag1.b[i & 7]), buf);
+		}
+		else
+		{
+			sprintf(buf, "dag_i%d", i);
+			m_drcuml->symbol_add(&m_core->dag2.i[i & 7], sizeof(m_core->dag2.i[i & 7]), buf);
+			sprintf(buf, "dag_m%d", i);
+			m_drcuml->symbol_add(&m_core->dag2.m[i & 7], sizeof(m_core->dag2.m[i & 7]), buf);
+			sprintf(buf, "dag_l%d", i);
+			m_drcuml->symbol_add(&m_core->dag2.l[i & 7], sizeof(m_core->dag2.l[i & 7]), buf);
+			sprintf(buf, "dag_b%d", i);
+			m_drcuml->symbol_add(&m_core->dag2.b[i & 7], sizeof(m_core->dag2.b[i & 7]), buf);
+		}
 	}
 
 	m_drcuml->symbol_add(&m_core->astat, sizeof(m_core->astat), "astat");

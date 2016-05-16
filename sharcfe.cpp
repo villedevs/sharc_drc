@@ -71,10 +71,6 @@
 #define DM_L_MODIFIED(desc,x)		do { (desc).regout[2] |= 1 << ((x) + 24); } while(0)
 
 
-#define SIGN_EXTEND6(x)				(((x) & 0x20) ? (0xffffffc0 | (x)) : (x))
-#define SIGN_EXTEND24(x)			(((x) & 0x800000) ? (0xff000000 | (x)) : (x))
-
-
 sharc_frontend::sharc_frontend(adsp21062_device *sharc, UINT32 window_start, UINT32 window_end, UINT32 max_sequence)
 	: drc_frontend(*sharc, window_start, window_end, max_sequence),
 		m_sharc(sharc)
@@ -89,6 +85,25 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 
 	desc.length = 1;
 	desc.cycles = 1;
+
+	// handle looping
+	if (m_loop.size() > 0)
+	{
+		for (int i = 0; i < m_loop.size(); i++)
+		{
+			LOOP_DESCRIPTOR &loop = m_loop.at(i);
+			if (loop.start_pc == desc.pc)
+			{
+				desc.flags |= OPFLAG_IS_BRANCH_TARGET;
+			}
+			if (loop.end_pc == desc.pc)
+			{
+				desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
+				m_loop.erase(m_loop.begin()+i);
+				break;
+			}
+		}
+	}
 
 	switch ((opcode >> 45) & 7)
 	{
@@ -286,22 +301,45 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 
 				case 0x0c:			// do until counter expired				|000|01100|
 				{
-					// TODO: condition check at loop address
+					int offset = SIGN_EXTEND24(opcode & 0xffffff);
+
+					LOOP_DESCRIPTOR loop;
+					loop.start_pc = desc.pc + 1;
+					loop.end_pc = desc.pc + offset;
+					loop.type = 1;
+					loop.condition = 0;
+					m_loop.push_back(loop);
 					break;
 				}
 
 				case 0x0d:			// do until counter expired				|000|01101|
 				{
-					// TODO: condition check at loop address
 					int ureg = (opcode >> 32) & 0xff;
 					if (!describe_ureg_access(desc, ureg, UREG_READ))
 						return false;
+
+					int offset = SIGN_EXTEND24(opcode & 0xffffff);
+
+					LOOP_DESCRIPTOR loop;
+					loop.start_pc = desc.pc + 1;
+					loop.end_pc = desc.pc + offset;
+					loop.type = 1;
+					loop.condition = 0;
+					m_loop.push_back(loop);
 					break;
 				}
 
 				case 0x0e:			// do until								|000|01110|
 				{
-					// TODO: condition check at loop address
+					int offset = SIGN_EXTEND24(opcode & 0xffffff);
+					int cond = (opcode >> 33) & 0x1f;
+
+					LOOP_DESCRIPTOR loop;
+					loop.start_pc = desc.pc + 1;
+					loop.end_pc = desc.pc + offset;
+					loop.type = 2;
+					loop.condition = cond;
+					m_loop.push_back(loop);
 					break;
 				}
 
@@ -571,6 +609,7 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 			{
 				int u = (opcode >> 38) & 0x1;
 				int d = (opcode >> 39) & 0x1;
+				int g = (opcode >> 40) & 0x1;
 				int dreg = (opcode >> 23) & 0xf;
 				int i = (opcode >> 41) & 0x7;
 				int cond = (opcode >> 33) & 0x1f;
@@ -588,11 +627,25 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					desc.flags |= OPFLAG_READS_MEMORY;
 				}
 				
-				DM_I_USED(desc, i);
-
-				if (u)	// post-modify with update
+				if (g)
 				{
-					DM_I_MODIFIED(desc, i);
+					// PM
+					PM_I_USED(desc, i);
+
+					if (u)	// post-modify with update
+					{
+						PM_I_MODIFIED(desc, i);
+					}
+				}
+				else
+				{
+					// DM
+					DM_I_USED(desc, i);
+
+					if (u)	// post-modify with update
+					{
+						DM_I_MODIFIED(desc, i);
+					}
 				}
 			}
 			break;

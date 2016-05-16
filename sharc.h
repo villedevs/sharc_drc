@@ -75,6 +75,10 @@ struct SHARC_DMA_OP
 
 
 
+#define SIGN_EXTEND6(x)				(((x) & 0x20) ? (0xffffffc0 | (x)) : (x))
+#define SIGN_EXTEND24(x)			(((x) & 0x800000) ? (0xff000000 | (x)) : (x))
+
+
 #define MCFG_SHARC_BOOT_MODE(boot_mode) \
 	adsp21062_device::set_boot_mode(*device, boot_mode);
 
@@ -101,6 +105,8 @@ public:
 	void sharc_cfunc_unimplemented();
 	void sharc_cfunc_read_iop();
 	void sharc_cfunc_write_iop();
+	void sharc_cfunc_pcstack_overflow();
+	void sharc_cfunc_pcstack_underflow();
 
 	enum ASTAT_FLAGS
 	{
@@ -324,6 +330,7 @@ private:
 		UINT32 mode1_delay_data;
 
 		astat_drc astat_drc;
+		UINT32 dreg_temp;
 	};
 
 	sharc_internal_state* m_core;
@@ -523,6 +530,8 @@ private:
 	void generate_write_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data);
 	void generate_read_ureg(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int ureg);
 	void generate_write_ureg(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int ureg, bool imm, UINT32 data);
+	void generate_push_pc(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 pc);
+	void generate_pop_pc(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
 
 	bool if_condition_astat(int condition);
 	bool if_condition_always_true(int condition);
