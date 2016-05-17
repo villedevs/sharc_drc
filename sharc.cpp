@@ -384,6 +384,28 @@ void adsp21062_device::device_start()
 	m_drcuml->symbol_add(&m_core->astat, sizeof(m_core->astat), "astat");
 	m_drcuml->symbol_add(&m_core->mode1, sizeof(m_core->mode1), "mode1");
 	m_drcuml->symbol_add(&m_core->mode2, sizeof(m_core->mode2), "mode2");
+	m_drcuml->symbol_add(&m_core->lcntr, sizeof(m_core->lcntr), "lcntr");
+	m_drcuml->symbol_add(&m_core->curlcntr, sizeof(m_core->curlcntr), "curlcntr");
+	m_drcuml->symbol_add(&m_core->imask, sizeof(m_core->imask), "imask");
+	m_drcuml->symbol_add(&m_core->imaskp, sizeof(m_core->imaskp), "imaskp");
+	m_drcuml->symbol_add(&m_core->irptl, sizeof(m_core->irptl), "irptl");
+	m_drcuml->symbol_add(&m_core->ustat1, sizeof(m_core->ustat1), "ustat1");
+	m_drcuml->symbol_add(&m_core->ustat2, sizeof(m_core->ustat2), "ustat2");
+	m_drcuml->symbol_add(&m_core->stky, sizeof(m_core->stky), "stky");
+
+	m_drcuml->symbol_add(&m_core->astat_drc.az, sizeof(m_core->astat_drc.az), "astat_az");
+	m_drcuml->symbol_add(&m_core->astat_drc.ac, sizeof(m_core->astat_drc.ac), "astat_ac");
+	m_drcuml->symbol_add(&m_core->astat_drc.an, sizeof(m_core->astat_drc.an), "astat_an");
+	m_drcuml->symbol_add(&m_core->astat_drc.av, sizeof(m_core->astat_drc.av), "astat_av");
+	m_drcuml->symbol_add(&m_core->astat_drc.ai, sizeof(m_core->astat_drc.ai), "astat_ai");
+	m_drcuml->symbol_add(&m_core->astat_drc.as, sizeof(m_core->astat_drc.as), "astat_as");
+	m_drcuml->symbol_add(&m_core->astat_drc.mv, sizeof(m_core->astat_drc.mv), "astat_mv");
+	m_drcuml->symbol_add(&m_core->astat_drc.mn, sizeof(m_core->astat_drc.mn), "astat_mn");
+	m_drcuml->symbol_add(&m_core->astat_drc.mu, sizeof(m_core->astat_drc.mu), "astat_mu");
+	m_drcuml->symbol_add(&m_core->astat_drc.mi, sizeof(m_core->astat_drc.mi), "astat_mi");
+	m_drcuml->symbol_add(&m_core->astat_drc.sz, sizeof(m_core->astat_drc.sz), "astat_sz");
+	m_drcuml->symbol_add(&m_core->astat_drc.sv, sizeof(m_core->astat_drc.sv), "astat_sv");
+	m_drcuml->symbol_add(&m_core->astat_drc.ss, sizeof(m_core->astat_drc.ss), "astat_ss");
 	
 	m_drcuml->symbol_add(&m_core->arg0, sizeof(m_core->arg0), "arg0");
 	m_drcuml->symbol_add(&m_core->arg1, sizeof(m_core->arg1), "arg1");

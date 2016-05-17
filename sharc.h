@@ -352,6 +352,10 @@ private:
 	uml::code_handle *m_pm_write32;
 	uml::code_handle *m_dm_read32;
 	uml::code_handle *m_dm_write32;
+	uml::code_handle *m_push_pc;
+	uml::code_handle *m_pop_pc;
+	uml::code_handle *m_push_loop;
+	uml::code_handle *m_pop_loop;
 
 	bool m_cache_dirty;
 
@@ -517,6 +521,10 @@ private:
 	void static_generate_nocode_handler();
 	void static_generate_out_of_cycles();
 	void static_generate_memory_accessor(MEM_ACCESSOR_TYPE type, const char *name, uml::code_handle *&handleptr);
+	void static_generate_push_pc();
+	void static_generate_pop_pc();
+	void static_generate_push_loop();
+	void static_generate_pop_loop();
 	void load_fast_iregs(drcuml_block *block);
 	void save_fast_iregs(drcuml_block *block);
 	void generate_sequence_instruction(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
@@ -530,8 +538,6 @@ private:
 	void generate_write_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data);
 	void generate_read_ureg(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int ureg);
 	void generate_write_ureg(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int ureg, bool imm, UINT32 data);
-	void generate_push_pc(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 pc);
-	void generate_pop_pc(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
 
 	bool if_condition_astat(int condition);
 	bool if_condition_always_true(int condition);
