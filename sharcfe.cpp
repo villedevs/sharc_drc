@@ -91,7 +91,7 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 	{
 		for (int i = 0; i < m_loop.size(); i++)
 		{
-			LOOP_DESCRIPTOR &loop = m_loop.at(i);
+			adsp21062_device::LOOP_DESCRIPTOR &loop = m_loop.at(i);
 			if (loop.start_pc == desc.pc)
 			{
 				desc.flags |= OPFLAG_IS_BRANCH_TARGET;
@@ -99,6 +99,7 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 			if (loop.end_pc == desc.pc)
 			{
 				desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
+				desc.targetpc = loop.start_pc;
 				m_loop.erase(m_loop.begin()+i);
 				break;
 			}
@@ -303,10 +304,10 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 				{
 					int offset = SIGN_EXTEND24(opcode & 0xffffff);
 
-					LOOP_DESCRIPTOR loop;
+					adsp21062_device::LOOP_DESCRIPTOR loop;
 					loop.start_pc = desc.pc + 1;
 					loop.end_pc = desc.pc + offset;
-					loop.type = 1;
+					loop.type = adsp21062_device::LOOP_TYPE_COUNTER;
 					loop.condition = 0;
 					m_loop.push_back(loop);
 					break;
@@ -320,10 +321,10 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 
 					int offset = SIGN_EXTEND24(opcode & 0xffffff);
 
-					LOOP_DESCRIPTOR loop;
+					adsp21062_device::LOOP_DESCRIPTOR loop;
 					loop.start_pc = desc.pc + 1;
 					loop.end_pc = desc.pc + offset;
-					loop.type = 1;
+					loop.type = adsp21062_device::LOOP_TYPE_COUNTER;
 					loop.condition = 0;
 					m_loop.push_back(loop);
 					break;
@@ -334,10 +335,10 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					int offset = SIGN_EXTEND24(opcode & 0xffffff);
 					int cond = (opcode >> 33) & 0x1f;
 
-					LOOP_DESCRIPTOR loop;
+					adsp21062_device::LOOP_DESCRIPTOR loop;
 					loop.start_pc = desc.pc + 1;
 					loop.end_pc = desc.pc + offset;
-					loop.type = 2;
+					loop.type = adsp21062_device::LOOP_TYPE_CONDITIONAL;
 					loop.condition = cond;
 					m_loop.push_back(loop);
 					break;

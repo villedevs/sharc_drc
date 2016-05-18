@@ -26,14 +26,6 @@ public:
 		UREG_WRITE
 	};
 
-	struct LOOP_DESCRIPTOR
-	{
-		UINT32 start_pc;
-		UINT32 end_pc;
-		int type;
-		int condition;
-	};
-
 protected:
 	// required overrides
 	virtual bool describe(opcode_desc &desc, const opcode_desc *prev) override;
@@ -46,7 +38,7 @@ private:
 
 	adsp21062_device *m_sharc;
 
-	std::vector<LOOP_DESCRIPTOR> m_loop;
+	std::vector<adsp21062_device::LOOP_DESCRIPTOR> m_loop;
 };
 
 #endif /* __SHARCFE_H__ */

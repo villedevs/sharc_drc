@@ -107,6 +107,8 @@ public:
 	void sharc_cfunc_write_iop();
 	void sharc_cfunc_pcstack_overflow();
 	void sharc_cfunc_pcstack_underflow();
+	void sharc_cfunc_loopstack_overflow();
+	void sharc_cfunc_loopstack_underflow();
 
 	enum ASTAT_FLAGS
 	{
@@ -171,6 +173,20 @@ public:
 		MEM_ACCESSOR_PM_WRITE32,
 		MEM_ACCESSOR_DM_READ32,
 		MEM_ACCESSOR_DM_WRITE32
+	};
+
+	enum LOOP_TYPE
+	{
+		LOOP_TYPE_COUNTER,
+		LOOP_TYPE_CONDITIONAL
+	};
+
+	struct LOOP_DESCRIPTOR
+	{
+		UINT32 start_pc;
+		UINT32 end_pc;
+		LOOP_TYPE type;
+		int condition;
 	};
 
 protected:
@@ -511,6 +527,7 @@ private:
 			int mode;
 			UINT32 data;
 		} mode1_delay;
+		std::vector<LOOP_DESCRIPTOR> loop;
 	};
 
 	void execute_run_drc();
