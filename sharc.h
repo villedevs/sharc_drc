@@ -77,6 +77,7 @@ struct SHARC_DMA_OP
 
 #define SIGN_EXTEND6(x)				(((x) & 0x20) ? (0xffffffc0 | (x)) : (x))
 #define SIGN_EXTEND24(x)			(((x) & 0x800000) ? (0xff000000 | (x)) : (x))
+#define MAKE_EXTRACT_MASK(start_bit, length)    ((0xffffffff << start_bit) & (((UINT32)0xffffffff) >> (32 - (start_bit + length))))
 
 
 #define MCFG_SHARC_BOOT_MODE(boot_mode) \

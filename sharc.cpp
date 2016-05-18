@@ -32,7 +32,7 @@ enum
 	SHARC_R8,       SHARC_R9,       SHARC_R10,      SHARC_R11,
 	SHARC_R12,      SHARC_R13,      SHARC_R14,      SHARC_R15,
 	SHARC_SYSCON,   SHARC_SYSSTAT,  SHARC_MRF,      SHARC_MRB,
-	SHARC_STSTKP,   SHARC_PCSTKP,   SHARC_LSTKP,
+	SHARC_STSTKP,   SHARC_PCSTKP,   SHARC_LSTKP,    SHARC_CURLCNTR,
 	SHARC_FADDR,    SHARC_DADDR,
 	SHARC_I0,       SHARC_I1,       SHARC_I2,       SHARC_I3,
 	SHARC_I4,       SHARC_I5,       SHARC_I6,       SHARC_I7,
@@ -414,6 +414,7 @@ void adsp21062_device::device_start()
 
 	m_drcuml->symbol_add(&m_core->dreg_temp, sizeof(m_core->dreg_temp), "dreg_temp");
 	m_drcuml->symbol_add(&m_core->lstkp, sizeof(m_core->lstkp), "lstkp");
+	m_drcuml->symbol_add(&m_core->px, sizeof(m_core->px), "px");
 
 	m_drcfe = std::make_unique<sharc_frontend>(this, COMPILE_BACKWARDS_BYTES, COMPILE_FORWARDS_BYTES, COMPILE_MAX_SEQUENCE);
 
@@ -646,6 +647,7 @@ void adsp21062_device::device_start()
 	state_add( SHARC_IMASK,  "IMASK", m_core->imask).formatstr("%08X");
 	state_add( SHARC_USTAT1, "USTAT1", m_core->ustat1).formatstr("%08X");
 	state_add( SHARC_USTAT2, "USTAT2", m_core->ustat2).formatstr("%08X");
+	state_add( SHARC_CURLCNTR, "CURLCNTR", m_core->curlcntr).formatstr("%08X");
 	state_add( SHARC_STSTKP, "STSTKP", m_core->status_stkp).formatstr("%08X");
 
 	state_add( SHARC_R0,     "R0", m_core->r[0].r).formatstr("%08X");

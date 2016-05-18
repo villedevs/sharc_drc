@@ -1025,9 +1025,9 @@ void adsp21062_device::generate_sequence_instruction(drcuml_block *block, compil
 					{
 						int label_expire = compiler->labelnum++;
 						UML_MOV(block, I1, mem(&m_core->lstkp));							// mov     i1,[m_core->lstkp]
-						UML_LOAD(block, I0, m_core->lastack, I1, SIZE_DWORD, SCALE_x4);		// load    i0,m_core->lastack,i1,dword,scale_x4
+						UML_LOAD(block, I0, m_core->lcstack, I1, SIZE_DWORD, SCALE_x4);		// load    i0,m_core->lcstack,i1,dword,scale_x4
 						UML_SUB(block, I0, I0, 1);											// sub     i0,1
-						UML_STORE(block, m_core->lastack, I1, I0, SIZE_DWORD, SCALE_x4);	// store   m_core->lastack,i1,i0,dword,scale_x4
+						UML_STORE(block, m_core->lcstack, I1, I0, SIZE_DWORD, SCALE_x4);	// store   m_core->lcstack,i1,i0,dword,scale_x4
 						UML_SUB(block, CURLCNTR, CURLCNTR, 1);								// sub     CURLCNTR,1
 						UML_JMPc(block, COND_E, label_expire);								// jne     label_expire
 
@@ -1251,12 +1251,14 @@ void adsp21062_device::generate_read_ureg(drcuml_block *block, compiler_state *c
 		case 0xdb:		// PX
 			UML_DMOV(block, I0, mem(&m_core->px));		// NOTE: this returns 64 bits
 			break;
-		case 0xdc:		// PX1
-			UML_DMOV(block, I0, mem(&m_core->px));
+		case 0xdc:		// PX1 (bits 0-15 of PX)
+			UML_MOV(block, I0, mem(&m_core->px));
+			UML_AND(block, I0, I0, 0xffff);
 			break;
-		case 0xdd:		// PX2
+		case 0xdd:		// PX2 (bits 16-47 of PX)
 			UML_DMOV(block, I0, mem(&m_core->px));
-			UML_DSHR(block, I0, I0, 32);
+			UML_DSHR(block, I0, I0, 16);
+			UML_DAND(block, I0, I0, 0xffffffff);
 			break;
 
 		default:
@@ -1356,30 +1358,40 @@ void adsp21062_device::generate_write_ureg(drcuml_block *block, compiler_state *
 		case 0x7e:		// STKY
 			UML_MOV(block, mem(&m_core->stky), imm ? data : I0);
 			break;
-		case 0xdc:		// PX1
+		case 0xdb:		// PX
 			if (imm)
 			{
-				UML_DAND(block, mem(&m_core->px), mem(&m_core->px), ~0xffffffff);
+				fatalerror("generate_write_ureg %02X with immediate!", ureg);
+			}
+			else
+			{
+				UML_DMOV(block, mem(&m_core->px), I0);
+			}
+			break;
+		case 0xdc:		// PX1 (bits 0-15 of PX)
+			if (imm)
+			{
+				UML_DAND(block, mem(&m_core->px), mem(&m_core->px), ~0xffff);
 				UML_DOR(block, mem(&m_core->px), mem(&m_core->px), (UINT64)(data));
 			}
 			else
 			{
-				UML_DAND(block, mem(&m_core->px), mem(&m_core->px), ~0xffffffff);
+				UML_DAND(block, mem(&m_core->px), mem(&m_core->px), ~0xffff);
 				UML_DXOR(block, I1, I1, I1);
-				UML_MOV(block, I1, I0);
+				UML_DAND(block, I1, I0, 0xffff);
 				UML_DOR(block, mem(&m_core->px), mem(&m_core->px), I1);
 			}
 			break;
-		case 0xdd:		// PX2
+		case 0xdd:		// PX2 (bits 16-47 of PX)
 			if (imm)
 			{
-				UML_DAND(block, mem(&m_core->px), mem(&m_core->px), 0xffffffff);
-				UML_DOR(block, mem(&m_core->px), mem(&m_core->px), (UINT64)(data) << 32);
+				UML_DAND(block, mem(&m_core->px), mem(&m_core->px), 0xffff);
+				UML_DOR(block, mem(&m_core->px), mem(&m_core->px), (UINT64)(data) << 16);
 			}
 			else
 			{
-				UML_DAND(block, mem(&m_core->px), mem(&m_core->px), 0xffffffff);				
-				UML_DSHL(block, I0, I0, 32);
+				UML_DAND(block, mem(&m_core->px), mem(&m_core->px), 0xffff);				
+				UML_DSHL(block, I0, I0, 16);
 				UML_DOR(block, mem(&m_core->px), mem(&m_core->px), I0);
 			}
 			break;
@@ -1733,7 +1745,88 @@ int adsp21062_device::generate_opcode(drcuml_block *block, compiler_state *compi
 
 		case 2:				// compute / ureg <-> DM|PM, register modify							|010|
 		{
-			return FALSE;
+			int u = (opcode >> 44) & 0x1;
+			int i = (opcode >> 41) & 0x7;
+			int m = (opcode >> 38) & 0x7;
+			int cond = (opcode >> 33) & 0x1f;
+			int g = (opcode >> 32) & 0x1;
+			int d = (opcode >> 31) & 0x1;
+			int ureg = (opcode >> 23) & 0xff;
+			int compute = opcode & 0x7fffff;
+
+			bool ureg_is_dreg = (ureg >= 0 && ureg < 16);
+			bool has_condition = !if_condition_always_true(cond);
+			int skip_label = 0;
+
+			if (has_condition)
+			{
+				skip_label = compiler->labelnum++;
+				generate_if_condition(block, compiler, desc, cond, skip_label);
+			}
+
+			if (d)
+			{
+				// UREG -> DM|PM
+				bool temp_ureg = false;
+
+				// save UREG if compute writes to it
+				if (compute != 0 && ureg_is_dreg && desc->regout[0] & (1 << (ureg & 0xf)))
+				{
+					UML_MOV(block, mem(&m_core->dreg_temp), REG(ureg & 0xf));
+					temp_ureg = true;
+				}
+				// compute
+				if (generate_compute(block, compiler, desc) == FALSE)
+					return FALSE;
+
+				// transfer
+				UML_MOV(block, I1, (g) ? PM_I(i) : DM_I(i));			// mov    i1,dm|pm[i]
+				if (u == 0)	// pre-modify without update
+					UML_ADD(block, I1, I1, (g) ? PM_M(m) : DM_M(m));	// add    i1,i1,dm|pm[m]
+				if (temp_ureg)
+					UML_MOV(block, I0, mem(&m_core->dreg_temp));		// mov    i0,[m_core->dreg_temp]
+				else
+					generate_read_ureg(block, compiler, desc, ureg);
+
+				if (ureg == 0xdb && (g))	// PX is 48-bit when writing to PM
+					UML_CALLH(block, *m_pm_write48);					// callh  pm_write48
+				else
+					UML_CALLH(block, (g) ? *m_pm_write32 : *m_dm_write32);	// callh  dm|pm_write32
+			}
+			else
+			{
+				// DM|PM -> UREG
+
+				// compute
+				if (generate_compute(block, compiler, desc) == FALSE)
+					return FALSE;
+
+				// transfer
+				UML_MOV(block, I1, (g) ? PM_I(i) : DM_I(i));			// mov    i1,dm|pm[i]
+				if (u == 0)	// pre-modify without update
+					UML_ADD(block, I1, I1, (g) ? PM_M(m) : DM_M(m));	// add    i1,i1,dm|pm[m]
+
+				if (ureg == 0xdb && (g))	// PX is 48-bit when reading from PM
+					UML_CALLH(block, *m_pm_read48);						// callh  pm_read48
+				else
+					UML_CALLH(block, (g) ? *m_pm_read32 : *m_dm_read32);	// callh  dm|pm_read32
+				generate_write_ureg(block, compiler, desc, ureg, false, 0);
+			}
+
+			if (u != 0)		// post-modify with update
+			{
+				if (g)
+					UML_ADD(block, PM_I(i), PM_I(i), PM_M(m));			// add    pm[i],pm[m]
+				else
+					UML_ADD(block, DM_I(i), DM_I(i), PM_M(m));			// add    dm[i],pm[m]8				
+
+				// TODO: update circular buffer
+			}
+
+			if (has_condition)
+				UML_LABEL(block, skip_label);
+
+			return TRUE;
 		}
 
 		case 3:
@@ -1960,6 +2053,9 @@ int adsp21062_device::generate_opcode(drcuml_block *block, compiler_state *compi
 int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc)
 {
 	UINT64 opcode = desc->opptr.q[0];
+	if ((opcode & 0x7fffff) == 0)
+		return TRUE;
+
 	int rs = (opcode >> 12) & 0xf;
 	int rn = (opcode >> 8) & 0xf;
 	int ra = rn;
@@ -2043,7 +2139,6 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 			{
 				switch (operation)
 				{
-					case 0x01:		// Rn = Rx + Ry
 					case 0x02:		// Rn = Rx - Ry
 					case 0x09:		// Rn = (Rx + Ry) / 2
 					case 0x61:		// Rn = MIN(Rx, Ry)
@@ -2082,6 +2177,16 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 					case 0xc4:		// Fn = RECIPS Fx
 					case 0xc5:		// Fn = RSQRTS Fx
 						return FALSE;
+
+					case 0x01:		// Rn = Rx + Ry
+						UML_ADD(block, REG(rn), REG(rx), REG(ry));
+						if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_AZ);
+						if (AN_CALC_REQUIRED) UML_SETc(block, COND_S, ASTAT_AN);
+						if (AV_CALC_REQUIRED) UML_SETc(block, COND_V, ASTAT_AV);
+						if (AC_CALC_REQUIRED) UML_SETc(block, COND_C, ASTAT_AC);
+						if (AS_CALC_REQUIRED) UML_MOV(block, ASTAT_AS, 0);
+						if (AI_CALC_REQUIRED) UML_MOV(block, ASTAT_AI, 0);
+						return TRUE;
 
 					case 0x0a:		// COMP(Rx, Ry)
 						UML_CMP(block, REG(rx), REG(ry));
@@ -2492,13 +2597,13 @@ void adsp21062_device::generate_if_condition(drcuml_block *block, compiler_state
 int adsp21062_device::generate_shift_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int data, int shiftop, int rn, int rx)
 {
 	INT8 shift = data & 0xff;
+	int bit = data & 0x3f;
+	int len = (data >> 6) & 0x3f;
 
 	switch (shiftop)
 	{
-		case 0x00:		// LSHIFT Rx BY <data8>
 		case 0x01:		// ASHIFT Rx BY <data8>		
-		case 0x10:		// FEXT Rx BY <data8>
-		case 0x11:		// FDEP Rx BY <data8>
+		case 0x11:		// FDEP Rx BY <bit6>:<len6>
 		case 0x12:		// FEXT Rx BY <bit6>:<len6> (SE)
 		case 0x13:		// FDEP Rx BY <bit6>:<len6> (SE)
 		case 0x30:		// BSET Rx BY <data8>
@@ -2507,6 +2612,27 @@ int adsp21062_device::generate_shift_imm(drcuml_block *block, compiler_state *co
 		case 0x33:		// BTST Rx BY <data8>
 			return FALSE;
 
+		case 0x00:		// LSHIFT Rx BY <data8>
+			if (abs(shift) >= 32)
+			{
+				UML_MOV(block, REG(rn), 0);
+				if (SZ_CALC_REQUIRED) UML_MOV(block, ASTAT_SZ, 1);
+				if (SV_CALC_REQUIRED) UML_MOV(block, ASTAT_SV, 1);
+				if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
+			}
+			else
+			{
+				if (shift < 0)
+					UML_SHR(block, REG(rn), REG(rx), -shift);
+				else
+					UML_SHL(block, REG(rn), REG(rx), shift);
+				if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
+				if (SV_CALC_REQUIRED && shift != 0) UML_MOV(block, ASTAT_SV, 1);
+				if (SV_CALC_REQUIRED && shift == 0) UML_MOV(block, ASTAT_SV, 0);
+				if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
+			}
+			return TRUE;
+
 		case 0x02:		// ROT Rx BY <data8>
 			UML_ROL(block, REG(rn), REG(rx), (shift < 0) ? 31 - ((-shift) & 0x1f) : shift & 0x1f);			
 			if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
@@ -2514,10 +2640,27 @@ int adsp21062_device::generate_shift_imm(drcuml_block *block, compiler_state *co
 			if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
 			return TRUE;
 
+		case 0x10:		// FEXT Rx BY <bit6>:<len6>
+			if (bit == 0)
+			{
+				UML_AND(block, REG(rn), REG(rx), MAKE_EXTRACT_MASK(bit, len));
+			}
+			else
+			{
+				UML_AND(block, I0, REG(rx), MAKE_EXTRACT_MASK(bit, len));
+				UML_SHR(block, REG(rn), I0, bit);
+			}
+			if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
+			if (SV_CALC_REQUIRED && (bit + len) > 32) UML_MOV(block, ASTAT_SV, 1);
+			if (SV_CALC_REQUIRED && (bit + len) <= 32) UML_MOV(block, ASTAT_SV, 0);
+			if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
+			return TRUE;
+
 		case 0x32:		// BTGL Rx BY <data8>
 			UML_XOR(block, REG(rn), REG(rx), 1 << data);
 			if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
 			if (SV_CALC_REQUIRED && data > 31) UML_MOV(block, ASTAT_SV, 1);
+			if (SV_CALC_REQUIRED && data <= 31) UML_MOV(block, ASTAT_SV, 0);
 			if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
 			return TRUE;
 
