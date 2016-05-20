@@ -73,6 +73,42 @@ struct SHARC_DMA_OP
 };
 
 
+// STKY flags
+#define AUS     0x1         /* ALU floating-point underflow */
+#define AVS     0x2         /* ALU floating-point overflow */
+#define AOS     0x4         /* ALU fixed-point overflow */
+#define AIS     0x20        /* ALU floating-point invalid operation */
+
+// MODE1 flags
+#define MODE1_BR8           0x1         /* Bit-reverse for I8 */
+#define MODE1_BR0           0x2         /* Bit-reverse for I0 */
+#define MODE1_SRCU          0x4         /* Alternate register select for computational units */
+#define MODE1_SRD1H         0x8         /* DAG alternate register select (7-4) */
+#define MODE1_SRD1L         0x10        /* DAG alternate register select (3-0) */
+#define MODE1_SRD2H         0x20        /* DAG alternate register select (15-12) */
+#define MODE1_SRD2L         0x40        /* DAG alternate register select (11-8) */
+#define MODE1_SRRFH         0x80        /* Register file alternate select for R(15-8) */
+#define MODE1_SRRFL         0x400       /* Register file alternate select for R(7-0) */
+#define MODE1_NESTM         0x800       /* Interrupt nesting enable */
+#define MODE1_IRPTEN        0x1000      /* Global interrupt enable */
+#define MODE1_ALUSAT        0x2000      /* Enable ALU fixed-point saturation */
+#define MODE1_SSE           0x4000      /* Enable short word sign extension */
+#define MODE1_TRUNCATE      0x8000      /* (1) Floating-point truncation / (0) round to nearest */
+#define MODE1_RND32         0x10000     /* (1) 32-bit floating-point rounding / (0) 40-bit rounding */
+#define MODE1_CSEL          0x60000     /* CSelect */
+
+// MODE2 flags
+#define MODE2_IRQ0E         0x1         /* IRQ0 (1) Edge sens. / (0) Level sens. */
+#define MODE2_IRQ1E         0x2         /* IRQ1 (1) Edge sens. / (0) Level sens. */
+#define MODE2_IRQ2E         0x4         /* IRQ2 (1) Edge sens. / (0) Level sens. */
+#define MODE2_CADIS         0x10        /* Cache disable */
+#define MODE2_TIMEN         0x20        /* Timer enable */
+#define MODE2_BUSLK         0x40        /* External bus lock */
+#define MODE2_FLG0O         0x8000      /* FLAG0 (1) Output / (0) Input */
+#define MODE2_FLG1O         0x10000     /* FLAG1 (1) Output / (0) Input */
+#define MODE2_FLG2O         0x20000     /* FLAG2 (1) Output / (0) Input */
+#define MODE2_FLG3O         0x40000     /* FLAG3 (1) Output / (0) Input */
+#define MODE2_CAFRZ         0x80000     /* Cache freeze */
 
 
 #define SIGN_EXTEND6(x)				(((x) & 0x20) ? (0xffffffc0 | (x)) : (x))
@@ -110,6 +146,8 @@ public:
 	void sharc_cfunc_pcstack_underflow();
 	void sharc_cfunc_loopstack_overflow();
 	void sharc_cfunc_loopstack_underflow();
+	void sharc_cfunc_statusstack_overflow();
+	void sharc_cfunc_statusstack_underflow();
 
 	enum ASTAT_FLAGS
 	{
@@ -164,6 +202,7 @@ public:
 		MODE1_WRITE_REG,
 		MODE1_SET,
 		MODE1_CLEAR,
+		MODE1_TOGGLE,
 	};
 
 	enum MEM_ACCESSOR_TYPE
@@ -188,6 +227,12 @@ public:
 		UINT32 end_pc;
 		LOOP_TYPE type;
 		int condition;
+	};
+
+	enum
+	{
+		EXCEPTION_INTERRUPT = 0,
+		EXCEPTION_COUNT
 	};
 
 protected:
@@ -348,6 +393,7 @@ private:
 
 		astat_drc astat_drc;
 		UINT32 dreg_temp;
+		UINT32 jmpdest;
 	};
 
 	sharc_internal_state* m_core;
@@ -373,6 +419,9 @@ private:
 	uml::code_handle *m_pop_pc;
 	uml::code_handle *m_push_loop;
 	uml::code_handle *m_pop_loop;
+	uml::code_handle *m_push_status;
+	uml::code_handle *m_pop_status;
+	uml::code_handle *m_exception[EXCEPTION_COUNT];		// exception handlers
 
 	bool m_cache_dirty;
 
@@ -539,10 +588,13 @@ private:
 	void static_generate_nocode_handler();
 	void static_generate_out_of_cycles();
 	void static_generate_memory_accessor(MEM_ACCESSOR_TYPE type, const char *name, uml::code_handle *&handleptr);
+	void static_generate_exception(UINT8 exception, const char *name);
 	void static_generate_push_pc();
 	void static_generate_pop_pc();
 	void static_generate_push_loop();
 	void static_generate_pop_loop();
+	void static_generate_push_status();
+	void static_generate_pop_status();
 	void load_fast_iregs(drcuml_block *block);
 	void save_fast_iregs(drcuml_block *block);
 	void generate_sequence_instruction(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);

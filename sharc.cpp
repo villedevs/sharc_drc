@@ -793,6 +793,7 @@ void adsp21062_device::device_reset()
 
 void adsp21062_device::execute_set_input(int irqline, int state)
 {
+	printf("Interrupt %d, %d\n", irqline, state);
 	if (irqline >= 0 && irqline <= 2)
 	{
 		if (state == ASSERT_LINE)
