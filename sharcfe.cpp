@@ -858,6 +858,13 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 
 		switch (multiop)
 		{
+			case 0x00:			// Rn = MRxx
+				REG_MODIFIED(desc, rn);
+				break;
+			case 0x01:			// MRxx = Rn
+				REG_USED(desc, rn);
+				break;
+
 			case 0x07:			// Ra = Rx + Ry,   Rs = Rx - Ry
 			case 0x0f:			// Fa = Fx + Fy,   Fs = Fx - Fy
 				REG_USED(desc, rx);
@@ -984,7 +991,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 				break;
 
 			default:
-				fatalerror("sharc_frontend::describe_compute: unknown multiop %02X in opcode %04X%08X", multiop, (UINT16)(opcode >> 32), (UINT32)(opcode));
+				fatalerror("sharc_frontend::describe_compute: unknown multiop %02X in opcode %04X%08X at %08X", multiop, (UINT16)(opcode >> 32), (UINT32)(opcode), desc.pc);
 				return false;
 		}
 	}
@@ -1578,6 +1585,8 @@ bool sharc_frontend::describe_shiftop_imm(opcode_desc &desc, int shiftop, int rn
 			break;
 
 		case 0x08:		// Rn = Rn OR LSHIFT Rx BY <data8>
+		case 0x19:		// Rn = Rn OR FDEP Rx BY <bit6>:<len6>
+		case 0x1b:		// Rn = Rn OR FDEP Rx BY <bit6>:<len6> (SE)
 			REG_USED(desc, rx);
 			REG_USED(desc, rn);
 			REG_MODIFIED(desc, rn);
@@ -1590,7 +1599,7 @@ bool sharc_frontend::describe_shiftop_imm(opcode_desc &desc, int shiftop, int rn
 			break;
 
 		default:
-			fatalerror("sharc_frontend::describe_shiftop_imm: unknown op %02X", shiftop);
+			fatalerror("sharc_frontend::describe_shiftop_imm: unknown op %02X at %08X", shiftop, desc.pc);
 			return false;
 	}
 
