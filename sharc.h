@@ -394,6 +394,11 @@ private:
 		astat_drc astat_drc;
 		UINT32 dreg_temp;
 		UINT32 jmpdest;
+
+		float fp0;
+		float fp1;
+
+		UINT32 force_recompile;
 	};
 
 	sharc_internal_state* m_core;

@@ -1,6 +1,6 @@
 // license:BSD-3-Clause
 // copyright-holders:Ville Linde
-/* Analog Devices ADSP-2106x SHARC emulator v2.0
+/* Analog Devices ADSP-2106x SHARC emulator v3.0
 
    Written by Ville Linde
 */
@@ -515,6 +515,9 @@ void adsp21062_device::device_start()
 	m_core->astat_old = 0;
 	m_core->astat_old_old = 0;
 	m_core->astat_old_old_old = 0;
+
+	m_core->fp0 = 0.0f;
+	m_core->fp1 = 1.0f;
 
 	save_item(NAME(m_core->pc));
 	save_pointer(NAME(&m_core->r[0].r), ARRAY_LENGTH(m_core->r));

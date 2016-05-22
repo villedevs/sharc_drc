@@ -67,6 +67,8 @@ using namespace uml;
 #define MODE2							mem(&m_core->mode2)
 #define IMASK							mem(&m_core->imask)
 #define IMASKP							mem(&m_core->imaskp)
+#define MRF								mem(&m_core->mrf)
+#define MRB								mem(&m_core->mrb)
 
 //#define ASTAT_CALC_REQUIRED				desc->regreq[0] & 0x10000
 #define AZ_CALC_REQUIRED				desc->regreq[0] & 0x00010000
@@ -365,6 +367,7 @@ void adsp21062_device::static_generate_memory_accessor(MEM_ACCESSOR_TYPE type, c
 			UML_DSTORE(block, block0_1, I1, I0, SIZE_WORD, SCALE_x2);	// dstore  [block0_1],i1,i0,word,scale_x2
 			UML_DSHR(block, I0, I0, 16);								// dshr    i0,i0,16
 			UML_DSTORE(block, block0, I1, I0, SIZE_WORD, SCALE_x2);		// dstore  [block0],i1,i0,word,scale_x2
+			UML_MOV(block, mem(&m_core->force_recompile), 1);
 			UML_RET(block);												// ret
 
 			UML_LABEL(block, label++);									// label1:
@@ -867,11 +870,15 @@ void adsp21062_device::execute_run_drc()
 	drcuml_state *drcuml = m_drcuml.get();
 	int execute_result;
 
+	if (m_cache_dirty)
+		printf("SHARC cache reset\n");
+
 	/* reset the cache if dirty */
 	if (m_cache_dirty)
 		flush_cache();
 
 	m_cache_dirty = false;
+	m_core->force_recompile = 0;
 
 	/* execute */
 	do
@@ -959,6 +966,15 @@ void adsp21062_device::compile_block(offs_t pc)
 				/* otherwise we just go to the next instruction */
 				else
 					nextpc = seqlast->pc + (seqlast->skipslots + 1);
+
+
+				// force recompilation at end of block, if needed
+				UML_CMP(block, mem(&m_core->force_recompile), 0);
+				UML_JMPc(block, COND_Z, compiler.labelnum);
+				UML_MOV(block, mem(&m_cache_dirty), 1);
+				UML_MOV(block, mem(&m_core->icount), 0);
+				UML_LABEL(block, compiler.labelnum++);
+
 
 				/* count off cycles and go there */
 				generate_update_cycles(block, &compiler, nextpc, TRUE);						// <subtract cycles>
@@ -1258,9 +1274,10 @@ void adsp21062_device::generate_call(drcuml_block *block, compiler_state *compil
 
 	compiler_state compiler_temp = *compiler;
 
+	// save branch target
 	if (desc->targetpc == BRANCH_TARGET_DYNAMIC)
 	{
-		fatalerror("generate_call: dynamic branch at %08X", desc->pc);
+		UML_MOV(block, mem(&m_core->jmpdest), I0);									   // mov     [jmpdest],i0
 	}
 
 	// compile delay slots if needed
@@ -1287,8 +1304,8 @@ void adsp21062_device::generate_call(drcuml_block *block, compiler_state *compil
 	}
 	else
 	{
-		//	generate_update_cycles(block, &compiler_temp, mem(&m_core->jmpdest), TRUE);
-		//	UML_HASHJMP(block, m_core->mode, mem(&m_core->jmpdest), *m_nocode);				// hashjmp  0,<reg>,nocode
+		generate_update_cycles(block, &compiler_temp, mem(&m_core->jmpdest), TRUE);
+		UML_HASHJMP(block, 0, mem(&m_core->jmpdest), *m_nocode);						// hashjmp  0,jmpdest,nocode
 	}
 
 	// update compiler label
@@ -1305,7 +1322,7 @@ void adsp21062_device::generate_jump(drcuml_block *block, compiler_state *compil
 
 	compiler_state compiler_temp = *compiler;
 
-	// save branch target if we have delay slots
+	// save branch target
 	if (desc->targetpc == BRANCH_TARGET_DYNAMIC)
 	{
 		UML_MOV(block, mem(&m_core->jmpdest), I0);									   // mov     [jmpdest],i0
@@ -2525,6 +2542,44 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 
 		switch (multiop)
 		{
+			case 0x00:			// Rn = MRxx
+			{
+				return FALSE;
+			}
+
+			case 0x01:			// MRxx = Rn
+			{
+				int ai = rs;
+				switch (ai)
+				{
+					case 0x00:	// MR0F
+						UML_DAND(block, MRF, MRF, U64(0xffffffff00000000));
+						UML_AND(block, I0, REG(rn), 0xffffffff);
+						UML_DOR(block, MRF, MRF, I0);
+						break;
+					case 0x01:	// MR1F
+						UML_DAND(block, MRF, MRF, U64(0x00000000ffffffff));
+						UML_DSHL(block, I0, REG(rn), 32);
+						UML_DOR(block, MRF, MRF, I0);
+						break;
+					case 0x02:	// MR2F
+						return FALSE;
+					case 0x04:	// MR0B
+						UML_DAND(block, MRB, MRB, U64(0xffffffff00000000));
+						UML_AND(block, I0, REG(rn), 0xffffffff);
+						UML_DOR(block, MRB, MRB, I0);
+						break;
+					case 0x05:	// MR1B
+						UML_DAND(block, MRB, MRB, U64(0x00000000ffffffff));
+						UML_DSHL(block, I0, REG(rn), 32);
+						UML_DOR(block, MRB, MRB, I0);
+						break;
+					case 0x06:	// MR2B
+						return FALSE;
+				}
+				return TRUE;
+			}
+
 			case 0x07:			// Ra = Rx + Ry,   Rs = Rx - Ry
 			case 0x0f:			// Fa = Fx + Fy,   Fs = Fx - Fy
 				return FALSE;
@@ -2876,10 +2931,34 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 					case 0x1d:		// MRF = RND MRF (S)
 					case 0x1e:		// MRB = RND MRB (U)
 					case 0x1f:		// MRB = RND MRB (S)
-					case 0x14:		// MRF = 0
-					case 0x16:		// MRB = 0
-					case 0x30:		// Fn = Fx * Fy
 						return FALSE;
+
+					case 0x14:		// MRF = 0
+						UML_DMOV(block, mem(&m_core->mrf), 0);
+						if (MN_CALC_REQUIRED) UML_MOV(block, ASTAT_MN, 0);
+						if (MV_CALC_REQUIRED) UML_MOV(block, ASTAT_MV, 0);
+						if (MU_CALC_REQUIRED) UML_MOV(block, ASTAT_MU, 0);
+						if (MI_CALC_REQUIRED) UML_MOV(block, ASTAT_MI, 0);
+						return TRUE;
+
+					case 0x16:		// MRB = 0
+						UML_DMOV(block, mem(&m_core->mrb), 0);
+						if (MN_CALC_REQUIRED) UML_MOV(block, ASTAT_MN, 0);
+						if (MV_CALC_REQUIRED) UML_MOV(block, ASTAT_MV, 0);
+						if (MU_CALC_REQUIRED) UML_MOV(block, ASTAT_MU, 0);
+						if (MI_CALC_REQUIRED) UML_MOV(block, ASTAT_MI, 0);
+						return TRUE;
+
+					case 0x30:		// Fn = Fx * Fy
+						UML_FSCOPYI(block, F0, REG(rx));
+						UML_FSCOPYI(block, F1, REG(ry));
+						UML_FSMUL(block, F0, F0, F1);
+						UML_ICOPYFS(block, REG(rn), F0);
+						if (MN_CALC_REQUIRED)
+							UML_FSCMP(block, F0, mem(&m_core->fp0));
+						if (MN_CALC_REQUIRED) UML_SETc(block, COND_C, ASTAT_MN);
+						// TODO: MV, MU, MI flags
+						return TRUE;
 
 					default:
 						return FALSE;
@@ -2929,6 +3008,8 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 
 void adsp21062_device::generate_if_condition(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int condition, int skip_label)
 {
+	code_label not_skip;
+
 	switch (condition)
 	{
 		case 0x00:                                    /* EQ */
@@ -2942,7 +3023,13 @@ void adsp21062_device::generate_if_condition(drcuml_block *block, compiler_state
 			UML_JMPc(block, COND_E, skip_label);
 			break;
 		case 0x02:                                    /* LE */
-			fatalerror("generate_if_condition 0x02"); // TODO
+			not_skip = compiler->labelnum++;
+			UML_TEST(block, ASTAT_AZ, 1);
+			UML_JMPc(block, COND_NZ, not_skip);
+			UML_TEST(block, ASTAT_AN, 1);
+			UML_JMPc(block, COND_NZ, not_skip);
+			UML_JMP(block, skip_label);
+			UML_LABEL(block, not_skip);
 			break;
 		case 0x03:                                    /* AC */
 			UML_TEST(block, ASTAT_AC, 1);
@@ -2998,10 +3085,19 @@ void adsp21062_device::generate_if_condition(drcuml_block *block, compiler_state
 			UML_JMPc(block, COND_NE, skip_label);
 			break;
 		case 0x11:                                    /* GE */
-			fatalerror("generate_if_condition 0x11"); // TODO
+			not_skip = compiler->labelnum++;
+			UML_TEST(block, ASTAT_AZ, 1);
+			UML_JMPc(block, COND_NZ, not_skip);
+			UML_TEST(block, ASTAT_AN, 1);
+			UML_JMPc(block, COND_Z, not_skip);
+			UML_JMP(block, skip_label);
+			UML_LABEL(block, not_skip);
 			break;
 		case 0x12:                                    /* GT */
-			fatalerror("generate_if_condition 0x12"); // TODO
+			UML_TEST(block, ASTAT_AZ, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
+			UML_TEST(block, ASTAT_AN, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
 			break;
 		case 0x13:                                    /* NOT AC */
 			UML_TEST(block, ASTAT_AC, 1);
