@@ -867,19 +867,15 @@ void adsp21062_device::static_generate_exception(UINT8 exception, const char *na
 
 void adsp21062_device::static_generate_mode1_ops()
 {
-	code_label label = 1;
-
-	code_label label_nopush = label++;
-
-	/* begin generating */
-	drcuml_block *block = m_drcuml->begin_block(1024);
+	drcuml_block *block;
 
 	// TODO: these could be further optimized with 64-bit or 128-bit swaps
 	// e.g SWAP128 instruction (swap 128 bits between 2 memory locations)
 
-	/* add a global entry for this */
+	block = m_drcuml->begin_block(128);
 	alloc_handle(m_drcuml.get(), &m_swap_dag1_0_3, "swap_dag1_0_3");
 	UML_HANDLE(block, *m_swap_dag1_0_3);									// handle  name
+	/*
 	for (int i = 0; i < 4; i++)
 	{
 		UML_MOV(block, I0, mem(&m_core->dag1.i[i]));
@@ -898,11 +894,18 @@ void adsp21062_device::static_generate_mode1_ops()
 		UML_MOV(block, I1, mem(&m_core->dag1_alt.b[i]));
 		UML_MOV(block, mem(&m_core->dag1.b[i]), I1);
 		UML_MOV(block, mem(&m_core->dag1_alt.b[i]), I0);
-	}
+	}*/
+	UML_SWAPDQ(block, mem(&m_core->dag1.i[0]), mem(&m_core->dag1_alt.i[0]));
+	UML_SWAPDQ(block, mem(&m_core->dag1.m[0]), mem(&m_core->dag1_alt.m[0]));
+	UML_SWAPDQ(block, mem(&m_core->dag1.l[0]), mem(&m_core->dag1_alt.l[0]));
+	UML_SWAPDQ(block, mem(&m_core->dag1.b[0]), mem(&m_core->dag1_alt.b[0]));
 	UML_RET(block);
+	block->end();
 
+	block = m_drcuml->begin_block(128);
 	alloc_handle(m_drcuml.get(), &m_swap_dag1_4_7, "swap_dag1_4_7");
 	UML_HANDLE(block, *m_swap_dag1_4_7);									// handle  name
+	/*
 	for (int i = 4; i < 8; i++)
 	{
 		UML_MOV(block, I0, mem(&m_core->dag1.i[i]));
@@ -921,11 +924,18 @@ void adsp21062_device::static_generate_mode1_ops()
 		UML_MOV(block, I1, mem(&m_core->dag1_alt.b[i]));
 		UML_MOV(block, mem(&m_core->dag1.b[i]), I1);
 		UML_MOV(block, mem(&m_core->dag1_alt.b[i]), I0);
-	}
+	}*/
+	UML_SWAPDQ(block, mem(&m_core->dag1.i[4]), mem(&m_core->dag1_alt.i[4]));
+	UML_SWAPDQ(block, mem(&m_core->dag1.m[4]), mem(&m_core->dag1_alt.m[4]));
+	UML_SWAPDQ(block, mem(&m_core->dag1.l[4]), mem(&m_core->dag1_alt.l[4]));
+	UML_SWAPDQ(block, mem(&m_core->dag1.b[4]), mem(&m_core->dag1_alt.b[4]));
 	UML_RET(block);
+	block->end();
 
+	block = m_drcuml->begin_block(128);
 	alloc_handle(m_drcuml.get(), &m_swap_dag2_0_3, "swap_dag2_0_3");
 	UML_HANDLE(block, *m_swap_dag2_0_3);									// handle  name
+	/*
 	for (int i = 0; i < 4; i++)
 	{
 		UML_MOV(block, I0, mem(&m_core->dag2.i[i]));
@@ -944,11 +954,18 @@ void adsp21062_device::static_generate_mode1_ops()
 		UML_MOV(block, I1, mem(&m_core->dag2_alt.b[i]));
 		UML_MOV(block, mem(&m_core->dag2.b[i]), I1);
 		UML_MOV(block, mem(&m_core->dag2_alt.b[i]), I0);
-	}
+	}*/
+	UML_SWAPDQ(block, mem(&m_core->dag2.i[0]), mem(&m_core->dag2_alt.i[0]));
+	UML_SWAPDQ(block, mem(&m_core->dag2.m[0]), mem(&m_core->dag2_alt.m[0]));
+	UML_SWAPDQ(block, mem(&m_core->dag2.l[0]), mem(&m_core->dag2_alt.l[0]));
+	UML_SWAPDQ(block, mem(&m_core->dag2.b[0]), mem(&m_core->dag2_alt.b[0]));
 	UML_RET(block);
+	block->end();
 
+	block = m_drcuml->begin_block(128);
 	alloc_handle(m_drcuml.get(), &m_swap_dag2_4_7, "swap_dag2_4_7");
 	UML_HANDLE(block, *m_swap_dag2_4_7);									// handle  name
+	/*
 	for (int i = 4; i < 8; i++)
 	{
 		UML_MOV(block, I0, mem(&m_core->dag2.i[i]));
@@ -967,31 +984,44 @@ void adsp21062_device::static_generate_mode1_ops()
 		UML_MOV(block, I1, mem(&m_core->dag2_alt.b[i]));
 		UML_MOV(block, mem(&m_core->dag2.b[i]), I1);
 		UML_MOV(block, mem(&m_core->dag2_alt.b[i]), I0);
-	}
+	}*/
+	UML_SWAPDQ(block, mem(&m_core->dag2.i[4]), mem(&m_core->dag2_alt.i[4]));
+	UML_SWAPDQ(block, mem(&m_core->dag2.m[4]), mem(&m_core->dag2_alt.m[4]));
+	UML_SWAPDQ(block, mem(&m_core->dag2.l[4]), mem(&m_core->dag2_alt.l[4]));
+	UML_SWAPDQ(block, mem(&m_core->dag2.b[4]), mem(&m_core->dag2_alt.b[4]));
 	UML_RET(block);
+	block->end();
 
+	block = m_drcuml->begin_block(64);
 	alloc_handle(m_drcuml.get(), &m_swap_r0_7, "swap_r0_7");
 	UML_HANDLE(block, *m_swap_r0_7);										// handle  name
+	/*
 	for (int i = 0; i < 8; i++)
 	{
 		UML_MOV(block, I0, mem(&m_core->r[i]));
 		UML_MOV(block, I1, mem(&m_core->reg_alt[i]));
 		UML_MOV(block, mem(&m_core->r[i]), I1);
 		UML_MOV(block, mem(&m_core->reg_alt[i]), I0);
-	}
+	}*/
+	UML_SWAPDQ(block, mem(&m_core->r[0]), mem(&m_core->reg_alt[0]));
+	UML_SWAPDQ(block, mem(&m_core->r[4]), mem(&m_core->reg_alt[4]));
 	UML_RET(block);
+	block->end();
 
+	block = m_drcuml->begin_block(64);
 	alloc_handle(m_drcuml.get(), &m_swap_r8_15, "swap_r8_15");
 	UML_HANDLE(block, *m_swap_r8_15);										// handle  name
+	/*
 	for (int i = 8; i < 16; i++)
 	{
 		UML_MOV(block, I0, mem(&m_core->r[i]));
 		UML_MOV(block, I1, mem(&m_core->reg_alt[i]));
 		UML_MOV(block, mem(&m_core->r[i]), I1);
 		UML_MOV(block, mem(&m_core->reg_alt[i]), I0);
-	}
+	}*/
+	UML_SWAPDQ(block, mem(&m_core->r[8]), mem(&m_core->reg_alt[8]));
+	UML_SWAPDQ(block, mem(&m_core->r[12]), mem(&m_core->reg_alt[12]));
 	UML_RET(block);
-
 	block->end();
 }
 
