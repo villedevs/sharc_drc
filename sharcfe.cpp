@@ -1059,6 +1059,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 					case 0x43:		// Rn = NOT Rx
 					case 0xb0:		// Fn = ABS(Fx)
 					case 0xa1:		// Fn = PASS Fx
+					case 0xa2:		// Fn = -Fx
 					case 0xa5:		// Fn = RND Fx
 					case 0xad:		// Rn = MANT Fx
 					case 0xc1:		// Rn = LOGB Fx
@@ -1072,8 +1073,32 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						ALU_FLAGS_MODIFIED(desc);
 						break;
 
+					case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75: case 0x76: case 0x77:
+					case 0x78: case 0x79: case 0x7a: case 0x7b: case 0x7c: case 0x7d: case 0x7e: case 0x7f:
+					{
+						/* Fixed-point Dual Add/Subtract */
+						REG_USED(desc, rx);
+						REG_USED(desc, ry);
+						REG_MODIFIED(desc, rn);
+						REG_MODIFIED(desc, ra);
+						ALU_FLAGS_MODIFIED(desc);
+						break;
+					}
+
+					case 0xf0: case 0xf1: case 0xf2: case 0xf3: case 0xf4: case 0xf5: case 0xf6: case 0xf7:
+					case 0xf8: case 0xf9: case 0xfa: case 0xfb: case 0xfc: case 0xfd: case 0xfe: case 0xff:
+					{
+						/* Floating-point Dual Add/Subtract */
+						REG_USED(desc, rx);
+						REG_USED(desc, ry);
+						REG_MODIFIED(desc, rn);
+						REG_MODIFIED(desc, ra);
+						ALU_FLAGS_MODIFIED(desc);
+						break;
+					}
+
 					default:
-						fatalerror("sharc_frontend::describe_compute: unknown ALU op %02X in opcode %04X%08X", operation, (UINT16)(opcode >> 32), (UINT32)(opcode));
+						fatalerror("sharc_frontend::describe_compute: unknown ALU op %02X in opcode %04X%08X at %08X", operation, (UINT16)(opcode >> 32), (UINT32)(opcode), desc.pc);
 						return false;
 				}
 				break;
@@ -1357,7 +1382,7 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						break;
 
 					default:
-						fatalerror("sharc_frontend::describe_compute: unknown mult op %02X in opcode %04X%08X", operation, (UINT16)(opcode >> 32), (UINT32)(opcode));
+						fatalerror("sharc_frontend::describe_compute: unknown mult op %02X in opcode %04X%08X at %08X", operation, (UINT16)(opcode >> 32), (UINT32)(opcode), desc.pc);
 				}
 				break;
 			}
@@ -1410,13 +1435,13 @@ bool sharc_frontend::describe_compute(opcode_desc &desc, UINT64 opcode)
 						break;
 
 					default:
-						fatalerror("sharc_frontend::describe_compute: unknown shift op %02X in opcode %04X%08X", operation, (UINT16)(opcode >> 32), (UINT32)(opcode));
+						fatalerror("sharc_frontend::describe_compute: unknown shift op %02X in opcode %04X%08X at %08X", operation, (UINT16)(opcode >> 32), (UINT32)(opcode), desc.pc);
 				}
 				break;
 			}
 
 			default:
-				fatalerror("sharc_frontend::describe_compute: unknown operation type in opcode %04X%08X", (UINT16)(opcode >> 32), (UINT32)(opcode));
+				fatalerror("sharc_frontend::describe_compute: unknown operation type in opcode %04X%08X at %08X", (UINT16)(opcode >> 32), (UINT32)(opcode), desc.pc);
 				return false;
 		}
 	}

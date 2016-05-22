@@ -64,6 +64,7 @@ using namespace uml;
 #define USTAT1							mem(&m_core->ustat1)
 #define USTAT2							mem(&m_core->ustat2)
 #define IRPTL							mem(&m_core->irptl)
+#define MODE1							mem(&m_core->mode1)
 #define MODE2							mem(&m_core->mode2)
 #define IMASK							mem(&m_core->imask)
 #define IMASKP							mem(&m_core->imaskp)
@@ -864,14 +865,146 @@ void adsp21062_device::static_generate_exception(UINT8 exception, const char *na
 }
 
 
+void adsp21062_device::static_generate_mode1_ops()
+{
+	code_label label = 1;
+
+	code_label label_nopush = label++;
+
+	/* begin generating */
+	drcuml_block *block = m_drcuml->begin_block(1024);
+
+	// TODO: these could be further optimized with 64-bit or 128-bit swaps
+	// e.g SWAP128 instruction (swap 128 bits between 2 memory locations)
+
+	/* add a global entry for this */
+	alloc_handle(m_drcuml.get(), &m_swap_dag1_0_3, "swap_dag1_0_3");
+	UML_HANDLE(block, *m_swap_dag1_0_3);									// handle  name
+	for (int i = 0; i < 4; i++)
+	{
+		UML_MOV(block, I0, mem(&m_core->dag1.i[i]));
+		UML_MOV(block, I1, mem(&m_core->dag1_alt.i[i]));
+		UML_MOV(block, mem(&m_core->dag1.i[i]), I1);
+		UML_MOV(block, mem(&m_core->dag1_alt.i[i]), I0);
+		UML_MOV(block, I0, mem(&m_core->dag1.m[i]));
+		UML_MOV(block, I1, mem(&m_core->dag1_alt.m[i]));
+		UML_MOV(block, mem(&m_core->dag1.m[i]), I1);
+		UML_MOV(block, mem(&m_core->dag1_alt.m[i]), I0);
+		UML_MOV(block, I0, mem(&m_core->dag1.l[i]));
+		UML_MOV(block, I1, mem(&m_core->dag1_alt.l[i]));
+		UML_MOV(block, mem(&m_core->dag1.l[i]), I1);
+		UML_MOV(block, mem(&m_core->dag1_alt.l[i]), I0);
+		UML_MOV(block, I0, mem(&m_core->dag1.b[i]));
+		UML_MOV(block, I1, mem(&m_core->dag1_alt.b[i]));
+		UML_MOV(block, mem(&m_core->dag1.b[i]), I1);
+		UML_MOV(block, mem(&m_core->dag1_alt.b[i]), I0);
+	}
+	UML_RET(block);
+
+	alloc_handle(m_drcuml.get(), &m_swap_dag1_4_7, "swap_dag1_4_7");
+	UML_HANDLE(block, *m_swap_dag1_4_7);									// handle  name
+	for (int i = 4; i < 8; i++)
+	{
+		UML_MOV(block, I0, mem(&m_core->dag1.i[i]));
+		UML_MOV(block, I1, mem(&m_core->dag1_alt.i[i]));
+		UML_MOV(block, mem(&m_core->dag1.i[i]), I1);
+		UML_MOV(block, mem(&m_core->dag1_alt.i[i]), I0);
+		UML_MOV(block, I0, mem(&m_core->dag1.m[i]));
+		UML_MOV(block, I1, mem(&m_core->dag1_alt.m[i]));
+		UML_MOV(block, mem(&m_core->dag1.m[i]), I1);
+		UML_MOV(block, mem(&m_core->dag1_alt.m[i]), I0);
+		UML_MOV(block, I0, mem(&m_core->dag1.l[i]));
+		UML_MOV(block, I1, mem(&m_core->dag1_alt.l[i]));
+		UML_MOV(block, mem(&m_core->dag1.l[i]), I1);
+		UML_MOV(block, mem(&m_core->dag1_alt.l[i]), I0);
+		UML_MOV(block, I0, mem(&m_core->dag1.b[i]));
+		UML_MOV(block, I1, mem(&m_core->dag1_alt.b[i]));
+		UML_MOV(block, mem(&m_core->dag1.b[i]), I1);
+		UML_MOV(block, mem(&m_core->dag1_alt.b[i]), I0);
+	}
+	UML_RET(block);
+
+	alloc_handle(m_drcuml.get(), &m_swap_dag2_0_3, "swap_dag2_0_3");
+	UML_HANDLE(block, *m_swap_dag2_0_3);									// handle  name
+	for (int i = 0; i < 4; i++)
+	{
+		UML_MOV(block, I0, mem(&m_core->dag2.i[i]));
+		UML_MOV(block, I1, mem(&m_core->dag2_alt.i[i]));
+		UML_MOV(block, mem(&m_core->dag2.i[i]), I1);
+		UML_MOV(block, mem(&m_core->dag2_alt.i[i]), I0);
+		UML_MOV(block, I0, mem(&m_core->dag2.m[i]));
+		UML_MOV(block, I1, mem(&m_core->dag2_alt.m[i]));
+		UML_MOV(block, mem(&m_core->dag2.m[i]), I1);
+		UML_MOV(block, mem(&m_core->dag2_alt.m[i]), I0);
+		UML_MOV(block, I0, mem(&m_core->dag2.l[i]));
+		UML_MOV(block, I1, mem(&m_core->dag2_alt.l[i]));
+		UML_MOV(block, mem(&m_core->dag2.l[i]), I1);
+		UML_MOV(block, mem(&m_core->dag2_alt.l[i]), I0);
+		UML_MOV(block, I0, mem(&m_core->dag2.b[i]));
+		UML_MOV(block, I1, mem(&m_core->dag2_alt.b[i]));
+		UML_MOV(block, mem(&m_core->dag2.b[i]), I1);
+		UML_MOV(block, mem(&m_core->dag2_alt.b[i]), I0);
+	}
+	UML_RET(block);
+
+	alloc_handle(m_drcuml.get(), &m_swap_dag2_4_7, "swap_dag2_4_7");
+	UML_HANDLE(block, *m_swap_dag2_4_7);									// handle  name
+	for (int i = 4; i < 8; i++)
+	{
+		UML_MOV(block, I0, mem(&m_core->dag2.i[i]));
+		UML_MOV(block, I1, mem(&m_core->dag2_alt.i[i]));
+		UML_MOV(block, mem(&m_core->dag2.i[i]), I1);
+		UML_MOV(block, mem(&m_core->dag2_alt.i[i]), I0);
+		UML_MOV(block, I0, mem(&m_core->dag2.m[i]));
+		UML_MOV(block, I1, mem(&m_core->dag2_alt.m[i]));
+		UML_MOV(block, mem(&m_core->dag2.m[i]), I1);
+		UML_MOV(block, mem(&m_core->dag2_alt.m[i]), I0);
+		UML_MOV(block, I0, mem(&m_core->dag2.l[i]));
+		UML_MOV(block, I1, mem(&m_core->dag2_alt.l[i]));
+		UML_MOV(block, mem(&m_core->dag2.l[i]), I1);
+		UML_MOV(block, mem(&m_core->dag2_alt.l[i]), I0);
+		UML_MOV(block, I0, mem(&m_core->dag2.b[i]));
+		UML_MOV(block, I1, mem(&m_core->dag2_alt.b[i]));
+		UML_MOV(block, mem(&m_core->dag2.b[i]), I1);
+		UML_MOV(block, mem(&m_core->dag2_alt.b[i]), I0);
+	}
+	UML_RET(block);
+
+	alloc_handle(m_drcuml.get(), &m_swap_r0_7, "swap_r0_7");
+	UML_HANDLE(block, *m_swap_r0_7);										// handle  name
+	for (int i = 0; i < 8; i++)
+	{
+		UML_MOV(block, I0, mem(&m_core->r[i]));
+		UML_MOV(block, I1, mem(&m_core->reg_alt[i]));
+		UML_MOV(block, mem(&m_core->r[i]), I1);
+		UML_MOV(block, mem(&m_core->reg_alt[i]), I0);
+	}
+	UML_RET(block);
+
+	alloc_handle(m_drcuml.get(), &m_swap_r8_15, "swap_r8_15");
+	UML_HANDLE(block, *m_swap_r8_15);										// handle  name
+	for (int i = 8; i < 16; i++)
+	{
+		UML_MOV(block, I0, mem(&m_core->r[i]));
+		UML_MOV(block, I1, mem(&m_core->reg_alt[i]));
+		UML_MOV(block, mem(&m_core->r[i]), I1);
+		UML_MOV(block, mem(&m_core->reg_alt[i]), I0);
+	}
+	UML_RET(block);
+
+	block->end();
+}
+
+
+
 
 void adsp21062_device::execute_run_drc()
 {
 	drcuml_state *drcuml = m_drcuml.get();
 	int execute_result;
 
-	if (m_cache_dirty)
-		printf("SHARC cache reset\n");
+//	if (m_cache_dirty)
+//		printf("SHARC cache reset\n");
 
 	/* reset the cache if dirty */
 	if (m_cache_dirty)
@@ -1016,6 +1149,7 @@ void adsp21062_device::flush_cache()
 		static_generate_pop_loop();
 		static_generate_push_status();
 		static_generate_pop_status();
+		static_generate_mode1_ops();
 
 		// generate exception handlers
 		static_generate_exception(EXCEPTION_INTERRUPT, "exception_interrupt");
@@ -1139,10 +1273,13 @@ void adsp21062_device::generate_sequence_instruction(drcuml_block *block, compil
 					fatalerror("MODE1 delay REG");
 					break;
 				case MODE1_SET:
-					fatalerror("MODE1 delay SET");
+					generate_set_mode1_imm(block, compiler, desc, compiler->mode1_delay.data);
 					break;
 				case MODE1_CLEAR:
 					fatalerror("MODE1 delay CLEAR");
+					break;
+				case MODE1_TOGGLE:
+					fatalerror("MODE1 delay TOGGLE");
 					break;
 			}
 		}
@@ -1263,10 +1400,122 @@ void adsp21062_device::generate_update_cycles(drcuml_block *block, compiler_stat
 
 void adsp21062_device::generate_write_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data)
 {
-	// TODO: swap effects
+	code_label skip;
 
-	UML_MOV(block, mem(&m_core->mode1), data);
+	// TODO: swap effects
+	if (data & 0x1)
+		fatalerror("generate_write_mode1_imm: tried to enable I8 bit reversing");
+	if (data & 0x2)
+		fatalerror("generate_write_mode1_imm: tried to enable I0 bit reversing");
+	if (data & 0x4)
+		fatalerror("generate_write_mode1_imm: tried to enable MR alternate");
+
+	// DAG1 regs 4-7
+	skip = compiler->labelnum++;
+	UML_TEST(block, MODE1, 0x8);
+	UML_JMPc(block, (data & 0x8) ? COND_NZ : COND_Z, skip);			// don't swap if the bits are same
+	UML_CALLH(block, *m_swap_dag1_4_7);
+	UML_LABEL(block, skip);
+
+	// DAG1 regs 0-3
+	skip = compiler->labelnum++;
+	UML_TEST(block, MODE1, 0x10);
+	UML_JMPc(block, (data & 0x10) ? COND_NZ : COND_Z, skip);		// don't swap if the bits are same
+	UML_CALLH(block, *m_swap_dag1_0_3);
+	UML_LABEL(block, skip);
+
+	// DAG2 regs 4-7
+	skip = compiler->labelnum++;
+	UML_TEST(block, MODE1, 0x20);
+	UML_JMPc(block, (data & 0x20) ? COND_NZ : COND_Z, skip);		// don't swap if the bits are same
+	UML_CALLH(block, *m_swap_dag2_4_7);
+	UML_LABEL(block, skip);
+
+	// DAG2 regs 0-3
+	skip = compiler->labelnum++;
+	UML_TEST(block, MODE1, 0x40);
+	UML_JMPc(block, (data & 0x40) ? COND_NZ : COND_Z, skip);		// don't swap if the bits are same
+	UML_CALLH(block, *m_swap_dag2_0_3);
+	UML_LABEL(block, skip);
+
+	// REG 8-15
+	skip = compiler->labelnum++;
+	UML_TEST(block, MODE1, 0x80);
+	UML_JMPc(block, (data & 0x80) ? COND_NZ : COND_Z, skip);		// don't swap if the bits are same
+	UML_CALLH(block, *m_swap_r8_15);
+	UML_LABEL(block, skip);
+
+	// REG 0-7
+	skip = compiler->labelnum++;
+	UML_TEST(block, MODE1, 0x400);
+	UML_JMPc(block, (data & 0x400) ? COND_NZ : COND_Z, skip);		// don't swap if the bits are same
+	UML_CALLH(block, *m_swap_r0_7);
+	UML_LABEL(block, skip);
+
+	UML_MOV(block, MODE1, data);
 }
+
+void adsp21062_device::generate_set_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data)
+{
+	if (data & 0x1)
+		fatalerror("generate_set_mode1_imm: tried to enable I8 bit reversing");
+	if (data & 0x2)
+		fatalerror("generate_set_mode1_imm: tried to enable I0 bit reversing");
+	if (data & 0x4)
+		fatalerror("generate_set_mode1_imm: tried to enable MR alternate");
+	if (data & 0x8)		// DAG1 regs 4-7
+	{
+		code_label skip = compiler->labelnum++;
+		UML_TEST(block, MODE1, 0x8);
+		UML_JMPc(block, COND_NZ, skip);		// don't swap if the bit is already 1
+		UML_CALLH(block, *m_swap_dag1_4_7);
+		UML_LABEL(block, skip);
+	}
+	if (data & 0x10)	// DAG1 regs 0-3
+	{
+		code_label skip = compiler->labelnum++;
+		UML_TEST(block, MODE1, 0x10);
+		UML_JMPc(block, COND_NZ, skip);		// don't swap if the bit is already 1
+		UML_CALLH(block, *m_swap_dag1_0_3);
+		UML_LABEL(block, skip);
+	}
+	if (data & 0x20)	// DAG2 regs 4-7
+	{
+		code_label skip = compiler->labelnum++;
+		UML_TEST(block, MODE1, 0x20);
+		UML_JMPc(block, COND_NZ, skip);		// don't swap if the bit is already 1
+		UML_CALLH(block, *m_swap_dag2_4_7);
+		UML_LABEL(block, skip);
+	}
+	if (data & 0x40)	// DAG1 regs 0-3
+	{
+		code_label skip = compiler->labelnum++;
+		UML_TEST(block, MODE1, 0x40);
+		UML_JMPc(block, COND_NZ, skip);		// don't swap if the bit is already 1
+		UML_CALLH(block, *m_swap_dag2_0_3);
+		UML_LABEL(block, skip);
+	}
+	if (data & 0x80)	// REG 8-15
+	{
+		code_label skip = compiler->labelnum++;
+		UML_TEST(block, MODE1, 0x80);
+		UML_JMPc(block, COND_NZ, skip);		// don't swap if the bit is already 1
+		UML_CALLH(block, *m_swap_r8_15);
+		UML_LABEL(block, skip);
+	}
+	if (data & 0x400)	// REG 0-7
+	{
+		code_label skip = compiler->labelnum++;
+		UML_TEST(block, MODE1, 0x400);
+		UML_JMPc(block, COND_NZ, skip);		// don't swap if the bit is already 1
+		UML_CALLH(block, *m_swap_r0_7);
+		UML_LABEL(block, skip);
+	}
+
+	UML_OR(block, MODE1, MODE1, data);
+}
+
+
 
 void adsp21062_device::generate_call(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, bool delayslot)
 {
@@ -2090,7 +2339,41 @@ int adsp21062_device::generate_opcode(drcuml_block *block, compiler_state *compi
 					{
 						case 0:		// SET
 						{
-							return FALSE;
+							switch (sreg)
+							{
+								case 0x0: // USTAT1
+									UML_OR(block, USTAT1, USTAT1, data);
+									break;
+								case 0x1: // USTAT2
+									UML_OR(block, USTAT2, USTAT2, data);
+									break;
+								case 0x9: // IRPTL
+									UML_OR(block, IRPTL, IRPTL, data);
+									break;
+								case 0xa: // MODE2
+									UML_OR(block, MODE2, MODE2, data);
+									break;
+								case 0xb: // MODE1
+									compiler->mode1_delay.counter = 2;
+									compiler->mode1_delay.data = data;
+									compiler->mode1_delay.mode = MODE1_SET;
+									break;
+								case 0xc: // ASTAT
+									return FALSE;
+								case 0xd: // IMASK
+									UML_OR(block, IMASK, IMASK, data);
+									break;
+								case 0xe: // STKY
+									UML_OR(block, STKY, STKY, data);
+									break;
+								case 0xf: // IMASKP
+									UML_OR(block, IMASKP, IMASKP, data);
+									break;
+
+								default:
+									return FALSE;
+							}
+							return TRUE;
 						}
 						case 1:		// CLEAR
 						{
@@ -2114,7 +2397,7 @@ int adsp21062_device::generate_opcode(drcuml_block *block, compiler_state *compi
 									break;
 								case 0xb: // MODE1
 									compiler->mode1_delay.counter = 2;
-									compiler->mode1_delay.data = 0;
+									compiler->mode1_delay.data = data;
 									compiler->mode1_delay.mode = MODE1_TOGGLE;
 									break;
 								case 0xc: // ASTAT
@@ -2657,8 +2940,8 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 					case 0x89:		// Fn = (Fx + Fy) / 2
 					case 0xbd:		// Fn = SCALB Fx BY Ry
 					case 0xd9:		// Rn = FIX Fx BY Ry
-					case 0xdd:		// Rn = TRUNC Fx BY Ry
 					case 0xda:		// Fn = FLOAT Rx BY Ry
+					case 0xdd:		// Rn = TRUNC Fx BY Ry
 					case 0xe1:		// Fn = MIN(Fx, Fy)
 					case 0xe2:		// Fn = MAX(Fx, Fy)
 					case 0xe3:		// Fn = CLIP Fx BY Fy
@@ -2678,7 +2961,6 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 					case 0xc1:		// Rn = LOGB Fx
 					case 0xc9:		// Rn = FIX Fx
 					case 0xcd:		// Rn = TRUNC Fx
-					case 0xca:		// Fn = FLOAT Rx
 					case 0xc4:		// Fn = RECIPS Fx
 					case 0xc5:		// Fn = RSQRTS Fx
 						return FALSE;
@@ -2760,6 +3042,18 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 						if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_AZ);
 						if (AN_CALC_REQUIRED) UML_SETc(block, COND_S, ASTAT_AN);
 						if (AV_CALC_REQUIRED) UML_MOV(block, ASTAT_AV, 0);
+						if (AC_CALC_REQUIRED) UML_MOV(block, ASTAT_AC, 0);
+						if (AS_CALC_REQUIRED) UML_MOV(block, ASTAT_AS, 0);
+						if (AI_CALC_REQUIRED) UML_MOV(block, ASTAT_AI, 0);
+						return TRUE;
+
+					case 0xca:		// Fn = FLOAT Rx
+						UML_FSFRINT(block, F0, REG(rx), SIZE_DWORD);
+						UML_ICOPYFS(block, REG(rn), F0);
+						if (AZ_CALC_REQUIRED)
+							UML_FSCMP(block, F0, mem(&m_core->fp0));
+						if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_AZ);
+						if (AN_CALC_REQUIRED) UML_SETc(block, COND_C, ASTAT_AN);
 						if (AC_CALC_REQUIRED) UML_MOV(block, ASTAT_AC, 0);
 						if (AS_CALC_REQUIRED) UML_MOV(block, ASTAT_AS, 0);
 						if (AI_CALC_REQUIRED) UML_MOV(block, ASTAT_AI, 0);

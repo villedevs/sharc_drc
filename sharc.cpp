@@ -11,7 +11,7 @@
 #include "sharcfe.h"
 
 
-#define ENABLE_DRC		1
+#define ENABLE_BLAST_PROCESSING		1
 
 
 
@@ -796,7 +796,6 @@ void adsp21062_device::device_reset()
 
 void adsp21062_device::execute_set_input(int irqline, int state)
 {
-	printf("Interrupt %d, %d\n", irqline, state);
 	if (irqline >= 0 && irqline <= 2)
 	{
 		if (state == ASSERT_LINE)
@@ -875,7 +874,7 @@ void adsp21062_device::check_interrupts()
 
 void adsp21062_device::execute_run()
 {
-#if ENABLE_DRC
+#if ENABLE_BLAST_PROCESSING
 	if (m_core->irq_pending != 0)
 	{
 		m_core->idle = 0;

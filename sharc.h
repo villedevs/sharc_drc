@@ -23,7 +23,7 @@ enum SHARC_BOOT_MODE
 };
 
 
-struct SHARC_DAG
+struct alignas(16) SHARC_DAG
 {
 	UINT32 i[8];
 	UINT32 m[8];
@@ -299,11 +299,13 @@ private:
 		};
 	};
 
-	struct sharc_internal_state
+	struct alignas(16) sharc_internal_state
 	{
-		UINT32 pc;
+		// needs to be first to get 16 byte alignment
 		SHARC_REG r[16];
 		SHARC_REG reg_alt[16];
+
+		UINT32 pc;
 		UINT64 mrf;
 		UINT64 mrb;
 
@@ -427,6 +429,12 @@ private:
 	uml::code_handle *m_push_status;
 	uml::code_handle *m_pop_status;
 	uml::code_handle *m_exception[EXCEPTION_COUNT];		// exception handlers
+	uml::code_handle *m_swap_dag1_0_3;
+	uml::code_handle *m_swap_dag1_4_7;
+	uml::code_handle *m_swap_dag2_0_3;
+	uml::code_handle *m_swap_dag2_4_7;
+	uml::code_handle *m_swap_r0_7;
+	uml::code_handle *m_swap_r8_15;
 
 	bool m_cache_dirty;
 
@@ -600,6 +608,7 @@ private:
 	void static_generate_pop_loop();
 	void static_generate_push_status();
 	void static_generate_pop_status();
+	void static_generate_mode1_ops();
 	void load_fast_iregs(drcuml_block *block);
 	void save_fast_iregs(drcuml_block *block);
 	void generate_sequence_instruction(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
@@ -611,6 +620,9 @@ private:
 	void generate_call(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, bool delayslot);
 	void generate_jump(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, bool delayslot, bool loopabort, bool clearint);
 	void generate_write_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data);
+	void generate_set_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data);
+	void generate_clear_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data);
+	void generate_toggle_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data);
 	void generate_read_ureg(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int ureg);
 	void generate_write_ureg(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int ureg, bool imm, UINT32 data);
 
