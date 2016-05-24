@@ -115,6 +115,10 @@ struct SHARC_DMA_OP
 #define SIGN_EXTEND24(x)			(((x) & 0x800000) ? (0xff000000 | (x)) : (x))
 #define MAKE_EXTRACT_MASK(start_bit, length)    ((0xffffffff << start_bit) & (((UINT32)0xffffffff) >> (32 - (start_bit + length))))
 
+#define OP_USERFLAG_COUNTER_LOOP		0x1
+#define OP_USERFLAG_COND_LOOP			0x2
+#define OP_USERFLAG_COND_FIELD			0x3c
+
 
 #define MCFG_SHARC_BOOT_MODE(boot_mode) \
 	adsp21062_device::set_boot_mode(*device, boot_mode);
@@ -213,20 +217,6 @@ public:
 		MEM_ACCESSOR_PM_WRITE32,
 		MEM_ACCESSOR_DM_READ32,
 		MEM_ACCESSOR_DM_WRITE32
-	};
-
-	enum LOOP_TYPE
-	{
-		LOOP_TYPE_COUNTER,
-		LOOP_TYPE_CONDITIONAL
-	};
-
-	struct LOOP_DESCRIPTOR
-	{
-		UINT32 start_pc;
-		UINT32 end_pc;
-		LOOP_TYPE type;
-		int condition;
 	};
 
 	enum
@@ -590,7 +580,6 @@ private:
 			int mode;
 			UINT32 data;
 		} mode1_delay;
-		std::vector<LOOP_DESCRIPTOR> loop;
 	};
 
 	void execute_run_drc();
@@ -625,6 +614,7 @@ private:
 	void generate_toggle_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data);
 	void generate_read_ureg(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int ureg);
 	void generate_write_ureg(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int ureg, bool imm, UINT32 data);
+	void generate_update_circular_buffer(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int g, int i);
 
 	bool if_condition_astat(int condition);
 	bool if_condition_always_true(int condition);

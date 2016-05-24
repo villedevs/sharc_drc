@@ -91,7 +91,7 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 	{
 		for (int i = 0; i < m_loop.size(); i++)
 		{
-			adsp21062_device::LOOP_DESCRIPTOR &loop = m_loop.at(i);
+			LOOP_DESCRIPTOR &loop = m_loop.at(i);
 			if (loop.start_pc == desc.pc)
 			{
 				desc.flags |= OPFLAG_IS_BRANCH_TARGET;
@@ -100,6 +100,15 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 			{
 				desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
 				desc.targetpc = loop.start_pc;
+				if (loop.type == LOOP_TYPE_COUNTER)
+				{
+					desc.userflags |= OP_USERFLAG_COUNTER_LOOP;
+				}
+				else if (loop.type == LOOP_TYPE_CONDITIONAL)
+				{
+					desc.userflags |= OP_USERFLAG_COND_LOOP;
+					desc.userflags |= (loop.condition << 2) & OP_USERFLAG_COND_FIELD;
+				}
 				m_loop.erase(m_loop.begin()+i);
 				break;
 			}
@@ -304,10 +313,10 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 				{
 					int offset = SIGN_EXTEND24(opcode & 0xffffff);
 
-					adsp21062_device::LOOP_DESCRIPTOR loop;
+					LOOP_DESCRIPTOR loop;
 					loop.start_pc = desc.pc + 1;
 					loop.end_pc = desc.pc + offset;
-					loop.type = adsp21062_device::LOOP_TYPE_COUNTER;
+					loop.type = LOOP_TYPE_COUNTER;
 					loop.condition = 0;
 					m_loop.push_back(loop);
 					break;
@@ -321,10 +330,10 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 
 					int offset = SIGN_EXTEND24(opcode & 0xffffff);
 
-					adsp21062_device::LOOP_DESCRIPTOR loop;
+					LOOP_DESCRIPTOR loop;
 					loop.start_pc = desc.pc + 1;
 					loop.end_pc = desc.pc + offset;
-					loop.type = adsp21062_device::LOOP_TYPE_COUNTER;
+					loop.type = LOOP_TYPE_COUNTER;
 					loop.condition = 0;
 					m_loop.push_back(loop);
 					break;
@@ -335,10 +344,10 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					int offset = SIGN_EXTEND24(opcode & 0xffffff);
 					int cond = (opcode >> 33) & 0x1f;
 
-					adsp21062_device::LOOP_DESCRIPTOR loop;
+					LOOP_DESCRIPTOR loop;
 					loop.start_pc = desc.pc + 1;
 					loop.end_pc = desc.pc + offset;
-					loop.type = adsp21062_device::LOOP_TYPE_CONDITIONAL;
+					loop.type = LOOP_TYPE_CONDITIONAL;
 					loop.condition = cond;
 					m_loop.push_back(loop);
 					break;

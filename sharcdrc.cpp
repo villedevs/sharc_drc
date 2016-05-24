@@ -1084,9 +1084,6 @@ void adsp21062_device::compile_block(offs_t pc)
 		{
 			block = m_drcuml->begin_block(4096);
 
-			UINT32 firstpc = pc;
-			UINT32 lastpc = 0;
-
 			for (seqhead = desclist; seqhead != nullptr; seqhead = seqlast->next())
 			{
 				const opcode_desc *curdesc;
@@ -1147,12 +1144,7 @@ void adsp21062_device::compile_block(offs_t pc)
 
 				if (seqlast->next() == nullptr || seqlast->next()->pc != nextpc)
 					UML_HASHJMP(block, 0, nextpc, *m_nocode);								// hashjmp <mode>,nextpc,nocode
-
-				lastpc = seqlast->pc;
 			}
-
-			//if (compiler.loop.size() > 0)
-			//	fatalerror("compile_block: loop list not empty at the end of block! (%08X to %08X, %08X)", firstpc, lastpc, compiler.loop.at(0).end_pc);
 
 			block->end();
 			succeeded = true;
@@ -1357,45 +1349,26 @@ void adsp21062_device::generate_sequence_instruction(drcuml_block *block, compil
 	}
 
 
-	// insert loop check at this instruction if needed
-	if (compiler->loop.size() > 0)
+	// insert loop check at this instruction if needed	
+	if (desc->userflags & OP_USERFLAG_COUNTER_LOOP)
 	{
-		for (int i = 0; i < compiler->loop.size(); i++)
-		{
-			LOOP_DESCRIPTOR &loop = compiler->loop.at(i);
-			if (loop.end_pc == desc->pc)
-			{
-				// insert loop check
-				switch (loop.type)
-				{
-					case LOOP_TYPE_COUNTER:
-					{
-						code_label label_expire = compiler->labelnum++;
-						UML_MOV(block, I1, mem(&m_core->lstkp));							// mov     i1,[m_core->lstkp]
-						UML_LOAD(block, I0, m_core->lcstack, I1, SIZE_DWORD, SCALE_x4);		// load    i0,m_core->lcstack,i1,dword,scale_x4
-						UML_SUB(block, I0, I0, 1);											// sub     i0,1
-						UML_STORE(block, m_core->lcstack, I1, I0, SIZE_DWORD, SCALE_x4);	// store   m_core->lcstack,i1,i0,dword,scale_x4
-						UML_SUB(block, CURLCNTR, CURLCNTR, 1);								// sub     CURLCNTR,1
-						UML_JMPc(block, COND_E, label_expire);								// jne     label_expire
+		code_label label_expire = compiler->labelnum++;
+		UML_MOV(block, I1, mem(&m_core->lstkp));							// mov     i1,[m_core->lstkp]
+		UML_LOAD(block, I0, m_core->lcstack, I1, SIZE_DWORD, SCALE_x4);		// load    i0,m_core->lcstack,i1,dword,scale_x4
+		UML_SUB(block, I0, I0, 1);											// sub     i0,1
+		UML_STORE(block, m_core->lcstack, I1, I0, SIZE_DWORD, SCALE_x4);	// store   m_core->lcstack,i1,i0,dword,scale_x4
+		UML_SUB(block, CURLCNTR, CURLCNTR, 1);								// sub     CURLCNTR,1
+		UML_JMPc(block, COND_E, label_expire);								// jne     label_expire
 
-						generate_jump(block, compiler, desc, false, false, false);
+		generate_jump(block, compiler, desc, false, false, false);
 
-						UML_LABEL(block, label_expire);										// label_expire:
-						UML_CALLH(block, *m_pop_pc);										// callh   m_pop_pc
-						UML_CALLH(block, *m_pop_loop);										// callh   m_pop_loop
-						break;
-					}
-
-					case LOOP_TYPE_CONDITIONAL:
-						fatalerror("SHARC: conditional loops unimplemented");
-						break;
-				}
-
-				// remove loop descriptor from the list
-				compiler->loop.erase(compiler->loop.begin() + i);
-				break;
-			}
-		}
+		UML_LABEL(block, label_expire);										// label_expire:
+		UML_CALLH(block, *m_pop_pc);										// callh   m_pop_pc
+		UML_CALLH(block, *m_pop_loop);										// callh   m_pop_loop
+	}
+	if (desc->userflags & OP_USERFLAG_COND_LOOP)
+	{
+		fatalerror("SHARC: conditional loops unimplemented");
 	}
 }
 
@@ -1609,6 +1582,13 @@ void adsp21062_device::generate_clear_mode1_imm(drcuml_block *block, compiler_st
 	}
 
 	UML_AND(block, MODE1, MODE1, ~data);
+}
+
+
+
+void adsp21062_device::generate_update_circular_buffer(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int g, int i)
+{
+	// TODO
 }
 
 
@@ -2005,7 +1985,41 @@ int adsp21062_device::generate_opcode(drcuml_block *block, compiler_state *compi
 
 				case 0x04:			// compute / modify						|000|00100|
 				{
-					return FALSE;
+					int cond = (opcode >> 33) & 0x1f;
+					int compute = opcode & 0x7fffff;
+					int g = (opcode >> 38) & 0x1;
+					int m = (opcode >> 27) & 0x7;
+					int i = (opcode >> 30) & 0x7;
+
+					bool has_condition = !if_condition_always_true(cond);
+					int skip_label = 0;
+
+					if (has_condition)
+					{
+						skip_label = compiler->labelnum++;
+						generate_if_condition(block, compiler, desc, cond, skip_label);
+					}
+
+					if (generate_compute(block, compiler, desc) == FALSE)
+						return FALSE;
+
+					if (g)
+					{
+						// PM
+						UML_ADD(block, PM_I(i), PM_I(i), PM_M(m));
+					}
+					else
+					{
+						// DM
+						UML_ADD(block, DM_I(i), DM_I(i), DM_M(m));
+					}
+
+					generate_update_circular_buffer(block, compiler, desc, g, i);
+
+					if (has_condition)
+						UML_LABEL(block, skip_label);
+
+					return TRUE;
 				}
 
 				case 0x06:			// direct jump|call						|000|00110|
@@ -2309,14 +2323,6 @@ int adsp21062_device::generate_opcode(drcuml_block *block, compiler_state *compi
 					UML_MOV(block, LCNTR, data);
 					if (data > 0)
 					{
-						// insert loop check at target address
-						LOOP_DESCRIPTOR loop;
-						loop.start_pc = desc->pc + 1;
-						loop.end_pc = address;
-						loop.condition = 0;
-						loop.type = LOOP_TYPE_COUNTER;
-						compiler->loop.push_back(loop);
-
 						// push pc
 						UML_MOV(block, I0, desc->pc + 1);
 						UML_CALLH(block, *m_push_pc);
@@ -2339,14 +2345,6 @@ int adsp21062_device::generate_opcode(drcuml_block *block, compiler_state *compi
 
 					UML_AND(block, I3, I0, 0xffff);
 					UML_MOV(block, LCNTR, I3);
-
-					// insert loop check at target address
-					LOOP_DESCRIPTOR loop;
-					loop.start_pc = desc->pc + 1;
-					loop.end_pc = address;
-					loop.condition = 0;
-					loop.type = LOOP_TYPE_COUNTER;
-					compiler->loop.push_back(loop);
 
 					// push pc
 					UML_MOV(block, I0, desc->pc + 1);
@@ -2719,7 +2717,7 @@ int adsp21062_device::generate_opcode(drcuml_block *block, compiler_state *compi
 				else
 					UML_ADD(block, DM_I(i), DM_I(i), DM_M(m));			// add    dm[i],dm[m]
 
-				// TODO: update circular buffer
+				generate_update_circular_buffer(block, compiler, desc, g, i);
 			}
 
 			if (has_condition)
@@ -2840,7 +2838,7 @@ int adsp21062_device::generate_opcode(drcuml_block *block, compiler_state *compi
 					else
 						UML_ADD(block, DM_I(i), DM_I(i), mod);				// add    dm[i],mod					
 
-					// TODO: update circular buffer
+					generate_update_circular_buffer(block, compiler, desc, g, i);
 				}
 				if (has_condition)
 					UML_LABEL(block, skip_label);
@@ -2920,7 +2918,7 @@ int adsp21062_device::generate_opcode(drcuml_block *block, compiler_state *compi
 				else
 					UML_ADD(block, DM_I(i), DM_I(i), DM_M(m));
 
-				// TODO: update circular buffer
+				generate_update_circular_buffer(block, compiler, desc, g, i);
 
 				if (has_condition)
 					UML_LABEL(block, skip_label);
@@ -3190,7 +3188,6 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 			{
 				switch (operation)
 				{
-					case 0x02:		// Rn = Rx - Ry
 					case 0x09:		// Rn = (Rx + Ry) / 2
 					case 0x61:		// Rn = MIN(Rx, Ry)
 					case 0x62:		// Rn = MAX(Rx, Ry)
@@ -3222,6 +3219,16 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 
 					case 0x01:		// Rn = Rx + Ry
 						UML_ADD(block, REG(rn), REG(rx), REG(ry));
+						if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_AZ);
+						if (AN_CALC_REQUIRED) UML_SETc(block, COND_S, ASTAT_AN);
+						if (AV_CALC_REQUIRED) UML_SETc(block, COND_V, ASTAT_AV);
+						if (AC_CALC_REQUIRED) UML_SETc(block, COND_C, ASTAT_AC);
+						if (AS_CALC_REQUIRED) UML_MOV(block, ASTAT_AS, 0);
+						if (AI_CALC_REQUIRED) UML_MOV(block, ASTAT_AI, 0);
+						return TRUE;
+
+					case 0x02:		// Rn = Rx - Ry
+						UML_SUB(block, REG(rn), REG(rx), REG(ry));
 						if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_AZ);
 						if (AN_CALC_REQUIRED) UML_SETc(block, COND_S, ASTAT_AN);
 						if (AV_CALC_REQUIRED) UML_SETc(block, COND_V, ASTAT_AV);
@@ -3931,7 +3938,6 @@ int adsp21062_device::generate_shift_imm(drcuml_block *block, compiler_state *co
 		case 0x11:		// FDEP Rx BY <bit6>:<len6>
 		case 0x13:		// FDEP Rx BY <bit6>:<len6> (SE)
 		case 0x1b:		// Rn = Rn OR FDEP Rx BY <bit6>:<len6> (SE)
-		case 0x31:		// BCLR Rx By <data8>
 			return FALSE;
 
 		case 0x00:		// LSHIFT Rx BY <data8>
@@ -4025,6 +4031,14 @@ int adsp21062_device::generate_shift_imm(drcuml_block *block, compiler_state *co
 
 		case 0x30:		// BSET Rx BY <data8>
 			UML_OR(block, REG(rn), REG(rx), 1 << data);
+			if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
+			if (SV_CALC_REQUIRED && data > 31) UML_MOV(block, ASTAT_SV, 1);
+			if (SV_CALC_REQUIRED && data <= 31) UML_MOV(block, ASTAT_SV, 0);
+			if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
+			return TRUE;
+
+		case 0x31:		// BCLR Rx By <data8>
+			UML_AND(block, REG(rn), REG(rx), ~(1 << data));
 			if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
 			if (SV_CALC_REQUIRED && data > 31) UML_MOV(block, ASTAT_SV, 1);
 			if (SV_CALC_REQUIRED && data <= 31) UML_MOV(block, ASTAT_SV, 0);
