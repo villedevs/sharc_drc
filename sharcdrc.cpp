@@ -1084,6 +1084,9 @@ void adsp21062_device::compile_block(offs_t pc)
 		{
 			block = m_drcuml->begin_block(4096);
 
+			UINT32 firstpc = pc;
+			UINT32 lastpc = 0;
+
 			for (seqhead = desclist; seqhead != nullptr; seqhead = seqlast->next())
 			{
 				const opcode_desc *curdesc;
@@ -1144,10 +1147,12 @@ void adsp21062_device::compile_block(offs_t pc)
 
 				if (seqlast->next() == nullptr || seqlast->next()->pc != nextpc)
 					UML_HASHJMP(block, 0, nextpc, *m_nocode);								// hashjmp <mode>,nextpc,nocode
+
+				lastpc = seqlast->pc;
 			}
 
-			if (compiler.loop.size() > 0)
-				fatalerror("compile_block: loop list not empty at the end of block!");
+			//if (compiler.loop.size() > 0)
+			//	fatalerror("compile_block: loop list not empty at the end of block! (%08X to %08X, %08X)", firstpc, lastpc, compiler.loop.at(0).end_pc);
 
 			block->end();
 			succeeded = true;
@@ -2544,7 +2549,55 @@ int adsp21062_device::generate_opcode(drcuml_block *block, compiler_state *compi
 						}
 						case 4:		// TEST
 						{
-							return FALSE;
+							switch (sreg)
+							{
+								case 0x0: // USTAT1
+									UML_AND(block, I0, USTAT1, data);
+									UML_CMP(block, I0, data);
+									UML_SETc(block, COND_E, ASTAT_BTF);
+									break;
+								case 0x1: // USTAT2
+									UML_AND(block, I0, USTAT2, data);
+									UML_CMP(block, I0, data);
+									UML_SETc(block, COND_E, ASTAT_BTF);
+									break;
+								case 0x9: // IRPTL
+									UML_AND(block, I0, IRPTL, data);
+									UML_CMP(block, I0, data);
+									UML_SETc(block, COND_E, ASTAT_BTF);
+									break;
+								case 0xa: // MODE2
+									UML_AND(block, I0, MODE2, data);
+									UML_CMP(block, I0, data);
+									UML_SETc(block, COND_E, ASTAT_BTF);
+									break;
+								case 0xb: // MODE1
+									UML_AND(block, I0, MODE1, data);
+									UML_CMP(block, I0, data);
+									UML_SETc(block, COND_E, ASTAT_BTF);
+									break;
+								case 0xc: // ASTAT
+									return FALSE;
+								case 0xd: // IMASK
+									UML_AND(block, I0, IMASK, data);
+									UML_CMP(block, I0, data);
+									UML_SETc(block, COND_E, ASTAT_BTF);
+									break;
+								case 0xe: // STKY
+									UML_AND(block, I0, STKY, data);
+									UML_CMP(block, I0, data);
+									UML_SETc(block, COND_E, ASTAT_BTF);
+									break;
+								case 0xf: // IMASKP
+									UML_AND(block, I0, IMASKP, data);
+									UML_CMP(block, I0, data);
+									UML_SETc(block, COND_E, ASTAT_BTF);
+									break;
+
+								default:
+									return FALSE;
+							}
+							return TRUE;
 						}
 						case 5:		// XOR
 						{
@@ -3259,6 +3312,31 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 						if (AI_CALC_REQUIRED) UML_MOV(block, ASTAT_AI, 0);
 						return TRUE;
 
+					case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75: case 0x76: case 0x77:
+					case 0x78: case 0x79: case 0x7a: case 0x7b: case 0x7c: case 0x7d: case 0x7e: case 0x7f:
+					{
+						/* Fixed-point Dual Add/Subtract */
+						UML_ADD(block, I0, REG(rx), REG(ry));						
+						if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_AZ);
+						if (AN_CALC_REQUIRED) UML_SETc(block, COND_S, ASTAT_AN);
+						if (AV_CALC_REQUIRED) UML_SETc(block, COND_V, ASTAT_AV);
+						if (AC_CALC_REQUIRED) UML_SETc(block, COND_C, ASTAT_AC);
+						UML_SUB(block, I1, REG(rx), REG(ry));
+						if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, I2);
+						if (AN_CALC_REQUIRED) UML_SETc(block, COND_S, I3);
+						if (AV_CALC_REQUIRED) UML_SETc(block, COND_V, I4);
+						if (AC_CALC_REQUIRED) UML_SETc(block, COND_C, I5);
+						if (AZ_CALC_REQUIRED) UML_OR(block, ASTAT_AZ, ASTAT_AZ, I2);
+						if (AN_CALC_REQUIRED) UML_OR(block, ASTAT_AN, ASTAT_AN, I3);
+						if (AV_CALC_REQUIRED) UML_OR(block, ASTAT_AV, ASTAT_AV, I4);
+						if (AC_CALC_REQUIRED) UML_OR(block, ASTAT_AC, ASTAT_AC, I5);
+						if (AS_CALC_REQUIRED) UML_MOV(block, ASTAT_AS, 0);
+						if (AI_CALC_REQUIRED) UML_MOV(block, ASTAT_AI, 0);
+						UML_MOV(block, REG(ra), I0);
+						UML_MOV(block, REG(rs), I1);
+						return TRUE;
+					}
+
 					case 0x81:		// Fn = Fx + Fy
 						// TODO: denormals
 						UML_FSCOPYI(block, F0, REG(rx));
@@ -3594,14 +3672,11 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 				{
 					case 0x00:		// Rn = LSHIFT Rx BY Ry | <data8>
 					case 0x04:		// Rn = ASHIFT Rx BY Ry | <data8>
-					case 0x08:		// Rn = ROT Rx BY Ry | <data8>
 					case 0xc4:		// Rn = BCLR Rx BY Ry | <data8>
 					case 0xc0:		// Rn = BSET Rx BY Ry | <data8>
 					case 0x44:		// Rn = FDEP Rx BY Ry | <bit6>:<len6>
 					case 0x4c:		// Rn = FDEP Rx BY Ry | <bit6>:<len6> (SE)
-					case 0x40:		// Rn = FEXT Rx BY Ry | <bit6>:<len6>
 					case 0x48:		// Rn = FEXT Rx BY Ry | <bit6>:<len6> (SE)
-					case 0x20:		// Rn = Rn OR LSHIFT Rx BY Ry | <data8>
 					case 0x24:		// Rn = Rn OR ASHIFT Rx BY Ry | <data8>
 					case 0x64:		// Rn = Rn OR FDEP Rx BY Ry | <bit6>:<len6>
 					case 0x6c:		// Rn = Rn OR FDEP Rx BY Ry | <bit6>:<len6> (SE)
@@ -3613,6 +3688,76 @@ int adsp21062_device::generate_compute(drcuml_block *block, compiler_state *comp
 					case 0x90:		// Rn = FPACK Fx
 					case 0x94:		// Fn = FUNPACK Rx
 						return FALSE;
+
+					case 0x08:		// Rn = ROT Rx BY Ry | <data8>
+					{
+						code_label shift_neg = compiler->labelnum++;
+						code_label shift_end = compiler->labelnum++;
+
+						UML_MOV(block, I0, REG(ry));
+						UML_CMP(block, I0, 0);
+						UML_JMPc(block, COND_L, shift_neg);
+						UML_ROL(block, I1, REG(rx), I0);
+						UML_JMP(block, shift_end);
+						UML_LABEL(block, shift_neg);
+						UML_SUB(block, I2, 0, I0);
+						UML_ROR(block, I1, REG(rx), I2);
+						UML_LABEL(block, shift_end);
+						if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
+						if (SV_CALC_REQUIRED) UML_MOV(block, ASTAT_SV, 0);
+						if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
+						UML_MOV(block, REG(rn), I1);
+						return TRUE;
+					}
+
+					case 0x20:		// Rn = Rn OR LSHIFT Rx BY Ry | <data8>
+					{
+						code_label shift_neg = compiler->labelnum++;
+						code_label shift_end = compiler->labelnum++;
+
+						UML_MOV(block, I0, REG(ry));
+						UML_CMP(block, I0, 0);
+						UML_JMPc(block, COND_L, shift_neg);
+						UML_SHL(block, I1, REG(rx), I0);
+						UML_JMP(block, shift_end);
+						UML_LABEL(block, shift_neg);
+						UML_SUB(block, I2, 0, I0);
+						UML_SHR(block, I1, REG(rx), I2);
+						UML_LABEL(block, shift_end);
+						if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
+						if (SV_CALC_REQUIRED)
+						{
+							UML_CMP(block, I0, 0);
+							UML_SETc(block, COND_NZ, ASTAT_SV);
+						}
+						if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
+						UML_OR(block, REG(rn), REG(rn), I1);
+
+						return TRUE;
+					}
+
+					case 0x40:		// Rn = FEXT Rx BY Ry | <bit6>:<len6>
+						// extraction mask
+						UML_MOV(block, I0, REG(ry));
+						UML_SHR(block, I1, I0, 6);
+						UML_AND(block, I1, I1, 0x3f);
+						UML_AND(block, I0, I0, 0x3f);
+						UML_MOV(block, I3, 0xffffffff);
+						UML_SUB(block, I2, 32, I0);
+						UML_SHR(block, I3, I3, I2);
+						UML_SHL(block, I3, I3, I1);
+
+						UML_AND(block, I2, REG(rx), I3);
+						UML_SHR(block, REG(rn), I2, I1);
+						if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
+						if (SV_CALC_REQUIRED)
+						{
+							UML_ADD(block, I0, I0, I1);
+							UML_CMP(block, I0, 32);
+							UML_SETc(block, COND_G, ASTAT_SV);
+						}
+						if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
+						return TRUE;
 
 					default:
 						return FALSE;
@@ -3786,9 +3931,7 @@ int adsp21062_device::generate_shift_imm(drcuml_block *block, compiler_state *co
 		case 0x11:		// FDEP Rx BY <bit6>:<len6>
 		case 0x13:		// FDEP Rx BY <bit6>:<len6> (SE)
 		case 0x1b:		// Rn = Rn OR FDEP Rx BY <bit6>:<len6> (SE)
-		case 0x30:		// BSET Rx BY <data8>
-		case 0x31:		// BCLR Rx By <data8>		
-		case 0x33:		// BTST Rx BY <data8>
+		case 0x31:		// BCLR Rx By <data8>
 			return FALSE;
 
 		case 0x00:		// LSHIFT Rx BY <data8>
@@ -3880,9 +4023,26 @@ int adsp21062_device::generate_shift_imm(drcuml_block *block, compiler_state *co
 			if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);			
 			return TRUE;
 
+		case 0x30:		// BSET Rx BY <data8>
+			UML_OR(block, REG(rn), REG(rx), 1 << data);
+			if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
+			if (SV_CALC_REQUIRED && data > 31) UML_MOV(block, ASTAT_SV, 1);
+			if (SV_CALC_REQUIRED && data <= 31) UML_MOV(block, ASTAT_SV, 0);
+			if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
+			return TRUE;
+
 		case 0x32:		// BTGL Rx BY <data8>
 			UML_XOR(block, REG(rn), REG(rx), 1 << data);
 			if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
+			if (SV_CALC_REQUIRED && data > 31) UML_MOV(block, ASTAT_SV, 1);
+			if (SV_CALC_REQUIRED && data <= 31) UML_MOV(block, ASTAT_SV, 0);
+			if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
+			return TRUE;
+
+		case 0x33:		// BTST Rx BY <data8>
+			UML_TEST(block, REG(rx), 1 << data);
+			if (SZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_SZ);
+			if (SZ_CALC_REQUIRED && data > 31) UML_MOV(block, ASTAT_SZ, 1);
 			if (SV_CALC_REQUIRED && data > 31) UML_MOV(block, ASTAT_SV, 1);
 			if (SV_CALC_REQUIRED && data <= 31) UML_MOV(block, ASTAT_SV, 0);
 			if (SS_CALC_REQUIRED) UML_MOV(block, ASTAT_SS, 0);
