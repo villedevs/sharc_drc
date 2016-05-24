@@ -262,7 +262,7 @@ private:
 	};
 	static const SHARC_OP s_sharc_opcode_table[];
 
-	struct astat_drc
+	struct ASTAT_DRC
 	{
 		union
 		{
@@ -283,7 +283,7 @@ private:
 				UINT32 ss;
 				UINT32 btf;
 				UINT32 af;
-				UINT32 pad;
+				UINT32 cacc;
 			};
 			UINT64 flags64[8];
 		};
@@ -383,7 +383,8 @@ private:
 		UINT64 arg64;
 		UINT32 mode1_delay_data;
 
-		astat_drc astat_drc;
+		ASTAT_DRC astat_drc;
+		ASTAT_DRC astat_drc_copy;
 		UINT32 dreg_temp;
 		UINT32 jmpdest;
 
@@ -612,9 +613,10 @@ private:
 	void generate_set_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data);
 	void generate_clear_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data);
 	void generate_toggle_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data);
-	void generate_read_ureg(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int ureg);
+	void generate_read_ureg(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int ureg, bool has_compute);
 	void generate_write_ureg(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int ureg, bool imm, UINT32 data);
 	void generate_update_circular_buffer(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int g, int i);
+	void generate_astat_copy(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
 
 	bool if_condition_astat(int condition);
 	bool if_condition_always_true(int condition);
