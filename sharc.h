@@ -115,9 +115,19 @@ struct SHARC_DMA_OP
 #define SIGN_EXTEND24(x)			(((x) & 0x800000) ? (0xff000000 | (x)) : (x))
 #define MAKE_EXTRACT_MASK(start_bit, length)    ((0xffffffff << start_bit) & (((UINT32)0xffffffff) >> (32 - (start_bit + length))))
 
-#define OP_USERFLAG_COUNTER_LOOP		0x1
-#define OP_USERFLAG_COND_LOOP			0x2
-#define OP_USERFLAG_COND_FIELD			0x3c
+#define OP_USERFLAG_COUNTER_LOOP			0x00000001
+#define OP_USERFLAG_COND_LOOP				0x00000002
+#define OP_USERFLAG_COND_FIELD				0x0000003c
+#define OP_USERFLAG_ASTAT_DELAY_COPY_AZ		0x00001000
+#define OP_USERFLAG_ASTAT_DELAY_COPY_AN		0x00002000
+#define OP_USERFLAG_ASTAT_DELAY_COPY_AC		0x00004000
+#define OP_USERFLAG_ASTAT_DELAY_COPY_AV		0x00008000
+#define OP_USERFLAG_ASTAT_DELAY_COPY_MV		0x00010000
+#define OP_USERFLAG_ASTAT_DELAY_COPY_MN		0x00020000
+#define OP_USERFLAG_ASTAT_DELAY_COPY_SV		0x00040000
+#define OP_USERFLAG_ASTAT_DELAY_COPY_SZ		0x00080000
+#define OP_USERFLAG_ASTAT_DELAY_COPY_BTF	0x00100000
+#define OP_USERFLAG_ASTAT_DELAY_COPY		0x001ff000
 
 
 #define MCFG_SHARC_BOOT_MODE(boot_mode) \
@@ -152,6 +162,10 @@ public:
 	void sharc_cfunc_loopstack_underflow();
 	void sharc_cfunc_statusstack_overflow();
 	void sharc_cfunc_statusstack_underflow();
+
+	void sharc_cfunc_unimplemented_compute();
+	void sharc_cfunc_unimplemented_shiftimm();
+	void sharc_cfunc_write_snoop();
 
 	enum ASTAT_FLAGS
 	{
@@ -385,6 +399,7 @@ private:
 
 		ASTAT_DRC astat_drc;
 		ASTAT_DRC astat_drc_copy;
+		ASTAT_DRC astat_delay_copy;
 		UINT32 dreg_temp;
 		UINT32 jmpdest;
 
@@ -604,9 +619,10 @@ private:
 	void generate_sequence_instruction(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
 	void generate_update_cycles(drcuml_block *block, compiler_state *compiler, uml::parameter param, int allow_exception);
 	int generate_opcode(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
-	int generate_compute(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
+	void generate_unimplemented_compute(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
+	void generate_compute(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
 	void generate_if_condition(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int condition, int skip_label);
-	int generate_shift_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int data, int shiftop, int rn, int rx);
+	void generate_shift_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int data, int shiftop, int rn, int rx);
 	void generate_call(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, bool delayslot);
 	void generate_jump(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, bool delayslot, bool loopabort, bool clearint);
 	void generate_write_mode1_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, UINT32 data);
@@ -618,8 +634,8 @@ private:
 	void generate_update_circular_buffer(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int g, int i);
 	void generate_astat_copy(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
 
-	bool if_condition_astat(int condition);
 	bool if_condition_always_true(int condition);
+	UINT32 do_condition_astat_bits(int condition);
 };
 
 

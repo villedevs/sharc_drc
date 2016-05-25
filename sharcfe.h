@@ -36,6 +36,7 @@ public:
 	{
 		UINT32 start_pc;
 		UINT32 end_pc;
+		UINT32 astat_check_pc;
 		LOOP_TYPE type;
 		int condition;
 	};

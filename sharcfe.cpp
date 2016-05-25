@@ -96,6 +96,22 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 			{
 				desc.flags |= OPFLAG_IS_BRANCH_TARGET;
 			}
+			if (loop.astat_check_pc == desc.pc)
+			{
+				if (loop.type == LOOP_TYPE_CONDITIONAL)
+				{
+					UINT32 flags = m_sharc->do_condition_astat_bits(loop.condition);
+					if (flags & adsp21062_device::ASTAT_FLAGS::AZ) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_AZ;
+					if (flags & adsp21062_device::ASTAT_FLAGS::AN) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_AN;
+					if (flags & adsp21062_device::ASTAT_FLAGS::AV) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_AV;
+					if (flags & adsp21062_device::ASTAT_FLAGS::AC) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_AC;
+					if (flags & adsp21062_device::ASTAT_FLAGS::MN) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_MN;
+					if (flags & adsp21062_device::ASTAT_FLAGS::MV) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_MV;
+					if (flags & adsp21062_device::ASTAT_FLAGS::SV) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_SV;
+					if (flags & adsp21062_device::ASTAT_FLAGS::SZ) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_SZ;
+					if (flags & adsp21062_device::ASTAT_FLAGS::BTF) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_BTF;
+				}
+			}
 			if (loop.end_pc == desc.pc)
 			{
 				desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
@@ -316,6 +332,7 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					LOOP_DESCRIPTOR loop;
 					loop.start_pc = desc.pc + 1;
 					loop.end_pc = desc.pc + offset;
+					loop.astat_check_pc = 0xffffffff;
 					loop.type = LOOP_TYPE_COUNTER;
 					loop.condition = 0;
 					m_loop.push_back(loop);
@@ -333,6 +350,7 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					LOOP_DESCRIPTOR loop;
 					loop.start_pc = desc.pc + 1;
 					loop.end_pc = desc.pc + offset;
+					loop.astat_check_pc = 0xffffffff;
 					loop.type = LOOP_TYPE_COUNTER;
 					loop.condition = 0;
 					m_loop.push_back(loop);
@@ -349,6 +367,11 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					loop.end_pc = desc.pc + offset;
 					loop.type = LOOP_TYPE_CONDITIONAL;
 					loop.condition = cond;
+
+					loop.astat_check_pc = loop.end_pc - 2;
+					if (loop.astat_check_pc < loop.start_pc)
+						fatalerror("describe_compute: conditional loop < 2 at %08X", desc.pc);
+
 					m_loop.push_back(loop);
 					break;
 				}

@@ -94,7 +94,7 @@ void adsp21062_device::dma_op(int channel)
 	//int dst_count     = m_core->dma_op[channel].dst_count;
 	int pmode           = m_core->dma_op[channel].pmode;
 
-	printf("dma_op: %08X, %08X, %08X, %08X, %08X, %d\n", src, dst, src_modifier, dst_modifier, src_count, pmode);
+	//printf("dma_op: %08X, %08X, %08X, %08X, %08X, %d\n", src, dst, src_modifier, dst_modifier, src_count, pmode);
 
 	switch (pmode)
 	{
