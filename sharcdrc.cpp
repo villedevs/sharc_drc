@@ -1433,7 +1433,14 @@ void adsp21062_device::generate_sequence_instruction(drcuml_block *block, compil
 	{
 		//fatalerror("SHARC: conditional loops unimplemented at %08X", desc->pc);
 
-		// TODO: actual looping
+		code_label label_expire = compiler->labelnum++;
+
+		int condition = (desc->userflags & OP_USERFLAG_COND_FIELD) >> OP_USERFLAG_COND_FIELD_SHIFT;
+		generate_do_condition(block, compiler, desc, condition, label_expire, m_core->astat_delay_copy);
+
+		generate_jump(block, compiler, desc, false, false, false);
+
+		UML_LABEL(block, label_expire);
 		UML_CALLH(block, *m_pop_pc);
 		UML_CALLH(block, *m_pop_loop);
 	}
@@ -2815,7 +2822,22 @@ int adsp21062_device::generate_opcode(drcuml_block *block, compiler_state *compi
 					}
 					else			// modify
 					{
-						return FALSE;
+						int g = (opcode >> 38) & 0x1;
+						int i = (opcode >> 32) & 0x7;
+						INT32 data = (INT32)(opcode);
+
+						if (g)
+						{
+							// PM
+							UML_ADD(block, PM_I(i), PM_I(i), data);
+						}
+						else
+						{
+							// DM
+							UML_ADD(block, DM_I(i), DM_I(i), data);
+						}
+						generate_update_circular_buffer(block, compiler, desc, g, i);
+						return TRUE;
 					}
 				}
 
@@ -3502,10 +3524,13 @@ void adsp21062_device::generate_compute(drcuml_block *block, compiler_state *com
 				UML_FSCOPYI(block, F2, REG(fxa));
 				UML_FSCOPYI(block, F3, REG(fya));
 				UML_FSMUL(block, F0, F0, F1);
-				UML_FSMAX(block, F2, F2, F3);
+
+				UML_FSMOV(block, F4, F2);
+				UML_FSCMP(block, F2, F3);
+				UML_FSMOVc(block, COND_C, F4, F3);
 
 				if (AZ_CALC_REQUIRED || AN_CALC_REQUIRED)
-					UML_FSCMP(block, F2, mem(&m_core->fp0));
+					UML_FSCMP(block, F4, mem(&m_core->fp0));
 				if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_AZ);
 				if (AN_CALC_REQUIRED) UML_SETc(block, COND_C, ASTAT_AN);
 				if (AV_CALC_REQUIRED) UML_MOV(block, ASTAT_AV, 0);	// TODO
@@ -3519,7 +3544,7 @@ void adsp21062_device::generate_compute(drcuml_block *block, compiler_state *com
 				// TODO: MV, MU, MI flags
 
 				UML_ICOPYFS(block, REG(fm), F0);
-				UML_ICOPYFS(block, REG(fa), F2);
+				UML_ICOPYFS(block, REG(fa), F4);
 				return;
 
 			case 0x1f:			// Fm = F3-0 * F7-4,   Fa = MIN(F11-8, F15-12)
@@ -3529,10 +3554,13 @@ void adsp21062_device::generate_compute(drcuml_block *block, compiler_state *com
 				UML_FSCOPYI(block, F2, REG(fxa));
 				UML_FSCOPYI(block, F3, REG(fya));
 				UML_FSMUL(block, F0, F0, F1);
-				UML_FSMIN(block, F2, F2, F3);
+
+				UML_FSMOV(block, F4, F2);
+				UML_FSCMP(block, F3, F2);
+				UML_FSMOVc(block, COND_C, F4, F3);
 
 				if (AZ_CALC_REQUIRED || AN_CALC_REQUIRED)
-					UML_FSCMP(block, F2, mem(&m_core->fp0));
+					UML_FSCMP(block, F4, mem(&m_core->fp0));
 				if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_AZ);
 				if (AN_CALC_REQUIRED) UML_SETc(block, COND_C, ASTAT_AN);
 				if (AV_CALC_REQUIRED) UML_MOV(block, ASTAT_AV, 0);	// TODO
@@ -3546,7 +3574,7 @@ void adsp21062_device::generate_compute(drcuml_block *block, compiler_state *com
 				// TODO: MV, MU, MI flags
 
 				UML_ICOPYFS(block, REG(fm), F0);
-				UML_ICOPYFS(block, REG(fa), F2);
+				UML_ICOPYFS(block, REG(fa), F4);
 				return;
 
 			default:
@@ -3570,8 +3598,6 @@ void adsp21062_device::generate_compute(drcuml_block *block, compiler_state *com
 					case 0x92:		// Fn = ABS(Fx - Fy)
 					case 0x89:		// Fn = (Fx + Fy) / 2
 					case 0xdd:		// Rn = TRUNC Fx BY Ry
-					case 0xe1:		// Fn = MIN(Fx, Fy)
-					case 0xe2:		// Fn = MAX(Fx, Fy)
 					case 0xe3:		// Fn = CLIP Fx BY Fy
 					case 0xe0:		// Fn = Fx COPYSIGN Fy
 					case 0x05:		// Rn = Rx + Ry + CI
@@ -3703,7 +3729,9 @@ void adsp21062_device::generate_compute(drcuml_block *block, compiler_state *com
 						return;
 
 					case 0x62:		// Rn = MAX(Rx, Ry)
-						UML_MAX(block, REG(rn), REG(rx), REG(ry));
+						UML_MOV(block, REG(rn), REG(rx));
+						UML_CMP(block, REG(rx), REG(ry));
+						UML_MOVc(block, COND_L, REG(rn), REG(ry));
 						if (AZ_CALC_REQUIRED || AN_CALC_REQUIRED)
 							UML_CMP(block, REG(rn), 0);
 						if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_AZ);
@@ -4011,6 +4039,42 @@ void adsp21062_device::generate_compute(drcuml_block *block, compiler_state *com
 						UML_LABEL(block, end);
 						return;
 					}
+
+					case 0xe1:		// Fn = MIN(Fx, Fy)
+						UML_FSCOPYI(block, F2, REG(rx));
+						UML_FSCOPYI(block, F3, REG(ry));
+						UML_FSMOV(block, F4, F2);
+						UML_FSCMP(block, F3, F2);
+						UML_FSMOVc(block, COND_C, F4, F3);
+
+						if (AZ_CALC_REQUIRED || AN_CALC_REQUIRED)
+							UML_FSCMP(block, F4, mem(&m_core->fp0));
+						if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_AZ);
+						if (AN_CALC_REQUIRED) UML_SETc(block, COND_C, ASTAT_AN);
+						if (AV_CALC_REQUIRED) UML_MOV(block, ASTAT_AV, 0);	// TODO
+						if (AC_CALC_REQUIRED) UML_MOV(block, ASTAT_AC, 0);
+						if (AS_CALC_REQUIRED) UML_MOV(block, ASTAT_AS, 0);
+						if (AI_CALC_REQUIRED) UML_MOV(block, ASTAT_AI, 0);	// TODO
+						UML_ICOPYFS(block, REG(rn), F4);
+						return;
+
+					case 0xe2:		// Fn = MAX(Fx, Fy)
+						UML_FSCOPYI(block, F2, REG(rx));
+						UML_FSCOPYI(block, F3, REG(ry));
+						UML_FSMOV(block, F4, F2);
+						UML_FSCMP(block, F2, F3);
+						UML_FSMOVc(block, COND_C, F4, F3);
+
+						if (AZ_CALC_REQUIRED || AN_CALC_REQUIRED)
+							UML_FSCMP(block, F4, mem(&m_core->fp0));
+						if (AZ_CALC_REQUIRED) UML_SETc(block, COND_Z, ASTAT_AZ);
+						if (AN_CALC_REQUIRED) UML_SETc(block, COND_C, ASTAT_AN);
+						if (AV_CALC_REQUIRED) UML_MOV(block, ASTAT_AV, 0);	// TODO
+						if (AC_CALC_REQUIRED) UML_MOV(block, ASTAT_AC, 0);
+						if (AS_CALC_REQUIRED) UML_MOV(block, ASTAT_AS, 0);
+						if (AI_CALC_REQUIRED) UML_MOV(block, ASTAT_AI, 0);	// TODO
+						UML_ICOPYFS(block, REG(rn), F4);
+						return;
 
 					case 0xf0: case 0xf1: case 0xf2: case 0xf3: case 0xf4: case 0xf5: case 0xf6: case 0xf7:
 					case 0xf8: case 0xf9: case 0xfa: case 0xfb: case 0xfc: case 0xfd: case 0xfe: case 0xff:
@@ -4402,6 +4466,7 @@ void adsp21062_device::generate_compute(drcuml_block *block, compiler_state *com
 
 void adsp21062_device::generate_if_condition(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int condition, int skip_label)
 {
+	// Jump to skip_label if condition is not true
 	code_label not_skip;
 
 	switch (condition)
@@ -4542,6 +4607,158 @@ void adsp21062_device::generate_if_condition(drcuml_block *block, compiler_state
 			break;
 		case 0x1f:                                    /* TRUE */
 			fatalerror("generate_if_condition 0x1f"); // should not happen
+			break;
+	}
+}
+
+void adsp21062_device::generate_do_condition(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int condition, int skip_label, ASTAT_DRC &astat)
+{
+	// Jump to skip_label if condition is true
+	code_label not_skip;
+
+	UML_JMP(block, skip_label);
+	return;
+
+	switch (condition)
+	{
+		case 0x00:                                    /* EQ */
+			UML_TEST(block, ASTAT_AZ, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
+			break;
+		case 0x01:                                    /* LT */
+			not_skip = compiler->labelnum++;
+			UML_TEST(block, ASTAT_AZ, 1);
+			UML_JMPc(block, COND_NZ, not_skip);
+			UML_TEST(block, ASTAT_AN, 1);
+			UML_JMPc(block, COND_Z, not_skip);
+			UML_JMP(block, skip_label);
+			UML_LABEL(block, not_skip);
+			break;
+		case 0x02:                                    /* LE */
+			UML_TEST(block, ASTAT_AZ, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
+			UML_TEST(block, ASTAT_AN, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
+			break;
+		case 0x03:                                    /* AC */
+			UML_TEST(block, ASTAT_AC, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
+			break;
+		case 0x04:                                    /* AV */
+			UML_TEST(block, ASTAT_AV, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
+			break;
+		case 0x05:                                    /* MV */
+			UML_TEST(block, ASTAT_MV, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
+			break;
+		case 0x06:                                    /* MS */
+			UML_TEST(block, ASTAT_MN, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
+			break;
+		case 0x07:                                    /* SV */
+			UML_TEST(block, ASTAT_SV, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
+			break;
+		case 0x08:                                    /* SZ */
+			UML_TEST(block, ASTAT_SZ, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
+			break;
+		case 0x09:                                    /* FLAG0 */
+			UML_CMP(block, FLAG0, 0);
+			UML_JMPc(block, COND_NE, skip_label);
+			break;
+		case 0x0a:                                    /* FLAG1 */
+			UML_CMP(block, FLAG1, 0);
+			UML_JMPc(block, COND_NE, skip_label);
+			break;
+		case 0x0b:                                    /* FLAG2 */
+			UML_CMP(block, FLAG2, 0);
+			UML_JMPc(block, COND_NE, skip_label);
+			break;
+		case 0x0c:                                    /* FLAG3 */
+			UML_CMP(block, FLAG3, 0);
+			UML_JMPc(block, COND_NE, skip_label);
+			break;
+		case 0x0d:                                    /* TF */
+			UML_TEST(block, ASTAT_BTF, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
+			break;
+		case 0x0e:                                    /* BM */
+			// infinite loop
+			break;
+		case 0x0f:                                    /* LCE */
+			fatalerror("generate_do_condition 0x0f");	// this should only be used with counter loops
+			break;
+		case 0x10:                                    /* NOT EQUAL */
+			UML_TEST(block, ASTAT_AZ, 1);
+			UML_JMPc(block, COND_Z, skip_label);
+			break;
+		case 0x11:                                    /* GE */
+			UML_TEST(block, ASTAT_AZ, 1);
+			UML_JMPc(block, COND_NZ, skip_label);
+			UML_TEST(block, ASTAT_AN, 1);
+			UML_JMPc(block, COND_Z, skip_label);
+			break;
+		case 0x12:                                    /* GT */
+			not_skip = compiler->labelnum++;
+			UML_TEST(block, ASTAT_AZ, 1);
+			UML_JMPc(block, COND_NZ, not_skip);
+			UML_TEST(block, ASTAT_AN, 1);
+			UML_JMPc(block, COND_NZ, not_skip);
+			UML_JMP(block, skip_label);
+			UML_LABEL(block, not_skip);
+			break;
+		case 0x13:                                    /* NOT AC */
+			UML_TEST(block, ASTAT_AC, 1);
+			UML_JMPc(block, COND_Z, skip_label);
+			break;
+		case 0x14:                                    /* NOT AV */
+			UML_TEST(block, ASTAT_AV, 1);
+			UML_JMPc(block, COND_Z, skip_label);
+			break;
+		case 0x15:                                    /* NOT MV */
+			UML_TEST(block, ASTAT_MV, 1);
+			UML_JMPc(block, COND_Z, skip_label);
+			break;
+		case 0x16:                                    /* NOT MS */
+			UML_TEST(block, ASTAT_MN, 1);
+			UML_JMPc(block, COND_Z, skip_label);
+			break;
+		case 0x17:                                    /* NOT SV */
+			UML_TEST(block, ASTAT_SV, 1);
+			UML_JMPc(block, COND_Z, skip_label);
+			break;
+		case 0x18:                                    /* NOT SZ */
+			UML_TEST(block, ASTAT_SZ, 1);
+			UML_JMPc(block, COND_Z, skip_label);
+			break;
+		case 0x19:                                    /* NOT FLAG0 */
+			UML_CMP(block, FLAG0, 0);
+			UML_JMPc(block, COND_E, skip_label);
+			break;
+		case 0x1a:                                    /* NOT FLAG1 */
+			UML_CMP(block, FLAG1, 0);
+			UML_JMPc(block, COND_E, skip_label);
+			break;
+		case 0x1b:                                    /* NOT FLAG2 */
+			UML_CMP(block, FLAG2, 0);
+			UML_JMPc(block, COND_E, skip_label);
+			break;
+		case 0x1c:                                    /* NOT FLAG3 */
+			UML_CMP(block, FLAG3, 0);
+			UML_JMPc(block, COND_E, skip_label);
+			break;
+		case 0x1d:                                    /* NOT TF */
+			UML_TEST(block, ASTAT_BTF, 1);
+			UML_JMPc(block, COND_Z, skip_label);
+			break;
+		case 0x1e:                                    /* NOT BM */
+			// always true
+			UML_JMP(block, skip_label);
+			break;
+		case 0x1f:                                    /* FALSE (FOREVER) */
+			// infinite loop
 			break;
 	}
 }

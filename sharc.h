@@ -118,6 +118,7 @@ struct SHARC_DMA_OP
 #define OP_USERFLAG_COUNTER_LOOP			0x00000001
 #define OP_USERFLAG_COND_LOOP				0x00000002
 #define OP_USERFLAG_COND_FIELD				0x0000003c
+#define OP_USERFLAG_COND_FIELD_SHIFT		2
 #define OP_USERFLAG_ASTAT_DELAY_COPY_AZ		0x00001000
 #define OP_USERFLAG_ASTAT_DELAY_COPY_AN		0x00002000
 #define OP_USERFLAG_ASTAT_DELAY_COPY_AC		0x00004000
@@ -622,6 +623,7 @@ private:
 	void generate_unimplemented_compute(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
 	void generate_compute(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc);
 	void generate_if_condition(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int condition, int skip_label);
+	void generate_do_condition(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int condition, int skip_label, ASTAT_DRC &astat);
 	void generate_shift_imm(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, int data, int shiftop, int rn, int rx);
 	void generate_call(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, bool delayslot);
 	void generate_jump(drcuml_block *block, compiler_state *compiler, const opcode_desc *desc, bool delayslot, bool loopabort, bool clearint);
