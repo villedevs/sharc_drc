@@ -19,6 +19,7 @@ class sharc_frontend : public drc_frontend
 {
 public:
 	sharc_frontend(adsp21062_device *sharc, UINT32 window_start, UINT32 window_end, UINT32 max_sequence);
+	void flush();
 
 	enum UREG_ACCESS
 	{
@@ -30,6 +31,21 @@ public:
 	{
 		LOOP_TYPE_COUNTER,
 		LOOP_TYPE_CONDITIONAL
+	};
+
+	enum LOOP_ENTRY_TYPE
+	{
+		LOOP_ENTRY_START = 0x1,
+		LOOP_ENTRY_EVALUATION = 0x2,
+		LOOP_ENTRY_ASTAT_CHECK = 0x4,
+	};
+
+	struct LOOP_ENTRY
+	{
+		UINT16 entrytype;
+		UINT8 looptype;
+		UINT8 condition;
+		UINT32 start_pc;
 	};
 
 	struct LOOP_DESCRIPTOR
@@ -51,9 +67,15 @@ private:
 	bool describe_shiftop_imm(opcode_desc &desc, int shiftop, int rn, int rx);
 	void describe_if_condition(opcode_desc &desc, int condition);
 
+	void insert_loop(const LOOP_DESCRIPTOR &loopdesc);
+	void add_loop_entry(UINT32 pc, UINT8 type, UINT32 start_pc, UINT8 looptype, UINT8 condition);
+	bool is_loop_evaluation(UINT32 pc);
+	bool is_loop_start(UINT32 pc);
+	bool is_astat_delay_check(UINT32 pc);
+
 	adsp21062_device *m_sharc;
 
-	std::vector<LOOP_DESCRIPTOR> m_loop;
+	std::unique_ptr<LOOP_ENTRY[]> m_loopmap;
 };
 
 #endif /* __SHARCFE_H__ */

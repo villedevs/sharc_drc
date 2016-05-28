@@ -1225,6 +1225,8 @@ void adsp21062_device::flush_cache()
 	/* empty the transient cache contents */
 	m_drcuml->reset();
 
+	m_drcfe->flush();
+
 	try
 	{
 		// generate the entry point and out-of-cycles handlers

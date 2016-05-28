@@ -75,6 +75,98 @@ sharc_frontend::sharc_frontend(adsp21062_device *sharc, UINT32 window_start, UIN
 	: drc_frontend(*sharc, window_start, window_end, max_sequence),
 		m_sharc(sharc)
 {
+	m_loopmap = std::make_unique<LOOP_ENTRY[]>(0x20000);
+}
+
+
+
+void sharc_frontend::flush()
+{
+	LOOP_ENTRY* map = m_loopmap.get();
+
+	memset(map, 0, sizeof(LOOP_ENTRY) * 0x20000);
+}
+
+void sharc_frontend::add_loop_entry(UINT32 pc, UINT8 type, UINT32 start_pc, UINT8 looptype, UINT8 condition)
+{
+	UINT32 l2 = pc >> 17;
+	UINT32 l1 = pc & 0x1ffff;
+
+	if (l2 != 0x1)
+		fatalerror("sharc_frontend::add_loop_entry: PC = %08X", pc);
+
+	LOOP_ENTRY* map = m_loopmap.get();
+	UINT32 current_type = map[l1].entrytype;
+	if (current_type & type)
+	{
+		// check for mismatch if the entry is already used
+		if (map[l1].start_pc != start_pc ||
+			map[l1].looptype != looptype ||
+			map[l1].condition != condition)
+		{
+			fatalerror("sharc_frontend::add_loop_entry: existing entry does match: start_pc %08X/%08X, looptype %02X/%02X, cond %02X/%02X", start_pc, map[l1].start_pc, looptype, map[l1].looptype, condition, map[l1].condition);
+		}
+	}
+
+	current_type |= type;
+
+	map[l1].entrytype = current_type;
+	map[l1].looptype = looptype;
+	map[l1].condition = condition;
+	map[l1].start_pc = start_pc;
+}
+
+void sharc_frontend::insert_loop(const LOOP_DESCRIPTOR &loopdesc)
+{
+	add_loop_entry(loopdesc.start_pc, LOOP_ENTRY_START, loopdesc.start_pc, loopdesc.type, loopdesc.condition);
+	add_loop_entry(loopdesc.end_pc, LOOP_ENTRY_EVALUATION, loopdesc.start_pc, loopdesc.type, loopdesc.condition);
+	if (loopdesc.astat_check_pc != 0xffffffff)
+		add_loop_entry(loopdesc.astat_check_pc, LOOP_ENTRY_ASTAT_CHECK, loopdesc.start_pc, loopdesc.type, loopdesc.condition);
+}
+
+bool sharc_frontend::is_loop_evaluation(UINT32 pc)
+{
+	UINT32 l2 = pc >> 17;
+	UINT32 l1 = pc & 0x1ffff;
+
+	if (l2 != 0x1)
+		return false;
+
+	LOOP_ENTRY* map = m_loopmap.get();
+	if (map[l1].entrytype & LOOP_ENTRY_EVALUATION)
+		return true;
+
+	return false;
+}
+
+bool sharc_frontend::is_loop_start(UINT32 pc)
+{
+	UINT32 l2 = pc >> 17;
+	UINT32 l1 = pc & 0x1ffff;
+
+	if (l2 != 0x1)
+		return false;
+
+	LOOP_ENTRY* map = m_loopmap.get();
+	if (map[l1].entrytype & LOOP_ENTRY_START)
+		return true;
+
+	return false;
+}
+
+bool sharc_frontend::is_astat_delay_check(UINT32 pc)
+{
+	UINT32 l2 = pc >> 17;
+	UINT32 l1 = pc & 0x1ffff;
+
+	if (l2 != 0x1)
+		return false;
+
+	LOOP_ENTRY* map = m_loopmap.get();
+	if (map[l1].entrytype & LOOP_ENTRY_ASTAT_CHECK)
+		return true;
+
+	return false;
 }
 
 
@@ -87,6 +179,7 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 	desc.cycles = 1;
 
 	// handle looping
+	/*
 	if (m_loop.size() > 0)
 	{
 		for (int i = 0; i < m_loop.size(); i++)
@@ -129,7 +222,51 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 				break;
 			}
 		}
+	}*/
+
+	if (is_astat_delay_check(desc.pc))
+	{
+		LOOP_ENTRY* map = m_loopmap.get();
+		int index = desc.pc & 0x1ffff;
+
+		if (map[index].looptype == LOOP_TYPE_CONDITIONAL)
+		{
+			UINT32 flags = m_sharc->do_condition_astat_bits(map[index].condition);
+			if (flags & adsp21062_device::ASTAT_FLAGS::AZ) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_AZ;
+			if (flags & adsp21062_device::ASTAT_FLAGS::AN) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_AN;
+			if (flags & adsp21062_device::ASTAT_FLAGS::AV) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_AV;
+			if (flags & adsp21062_device::ASTAT_FLAGS::AC) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_AC;
+			if (flags & adsp21062_device::ASTAT_FLAGS::MN) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_MN;
+			if (flags & adsp21062_device::ASTAT_FLAGS::MV) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_MV;
+			if (flags & adsp21062_device::ASTAT_FLAGS::SV) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_SV;
+			if (flags & adsp21062_device::ASTAT_FLAGS::SZ) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_SZ;
+			if (flags & adsp21062_device::ASTAT_FLAGS::BTF) desc.userflags |= OP_USERFLAG_ASTAT_DELAY_COPY_BTF;
+		}
 	}
+
+	if (is_loop_start(desc.pc))
+	{
+		desc.flags |= OPFLAG_IS_BRANCH_TARGET;
+	}
+
+	if (is_loop_evaluation(desc.pc))
+	{
+		LOOP_ENTRY* map = m_loopmap.get();
+		int index = desc.pc & 0x1ffff;
+
+		desc.flags |= OPFLAG_IS_CONDITIONAL_BRANCH;
+		desc.targetpc = map[index].start_pc;
+		if (map[index].looptype == LOOP_TYPE_COUNTER)
+		{
+			desc.userflags |= OP_USERFLAG_COUNTER_LOOP;
+		}
+		else if (map[index].looptype == LOOP_TYPE_CONDITIONAL)
+		{
+			desc.userflags |= OP_USERFLAG_COND_LOOP;
+			desc.userflags |= (map[index].condition << 2) & OP_USERFLAG_COND_FIELD;
+		}
+	}
+
 
 	switch ((opcode >> 45) & 7)
 	{
@@ -335,7 +472,8 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					loop.astat_check_pc = 0xffffffff;
 					loop.type = LOOP_TYPE_COUNTER;
 					loop.condition = 0;
-					m_loop.push_back(loop);
+
+					insert_loop(loop);
 					break;
 				}
 
@@ -353,7 +491,8 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					loop.astat_check_pc = 0xffffffff;
 					loop.type = LOOP_TYPE_COUNTER;
 					loop.condition = 0;
-					m_loop.push_back(loop);
+
+					insert_loop(loop);
 					break;
 				}
 
@@ -372,7 +511,7 @@ bool sharc_frontend::describe(opcode_desc &desc, const opcode_desc *prev)
 					if (loop.astat_check_pc < loop.start_pc)
 						fatalerror("describe_compute: conditional loop < 2 at %08X", desc.pc);
 
-					m_loop.push_back(loop);
+					insert_loop(loop);
 					break;
 				}
 
